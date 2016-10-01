@@ -6,11 +6,11 @@ import itertools
 import sys
 
 # Path cost
-#def path_cost(path, damage_map):
-#    cost = 0
-#    for state in path:
-#        cost += step_cost(None, state, damage_map, None)
-#    return cost
+def path_cost(path, damage_map):
+    cost = 0
+    for state in path:
+        cost += step_cost(None, state, damage_map, None)
+    return cost
 
 # Cost of a single step
 def step_cost(unit, pos, damage_map, turn):
@@ -23,10 +23,6 @@ def reconstruct_path(came_from, state_data_map, end):
     while (state in came_from):
         new_state = came_from[state]
         path.append(state)
-        
-        # Possibly wait on the same square for a turn
-        #for i in range(0, state_data_map[state].turn - state_data_map[new_state].turn):
-        #    path.append(state)
         state = new_state
 
     return path
@@ -70,7 +66,7 @@ class AStar(object):
 
     def get_neighbours(self, state, damage_map):
         for p in itertools.product(range(state[0]-1, state[0]+2), range(state[1]-1, state[1]+2)):            
-            if (damage_map.world.get_tile(p) and not damage_map.world.get_tile(p).does_block_movement()):
+            if (damage_map.can_move_to(p)):
                 yield p
 
     def get_or_create_data(self, state):
@@ -134,6 +130,6 @@ class AStar(object):
                     self.open_queue.put(neighbour_data)
 
         if (path == None):
-            print("No solution")        
+            print("No solution")
 
         return path

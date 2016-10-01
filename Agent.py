@@ -113,9 +113,11 @@ class Agent:
         # Custom A* implementation
         astar = AStar()
         path = astar.get_path(self, self.position, destination, self.damage_map)
-        if len(path.path_list) == 0:
+        if not path or len(path.path_list) == 0:
             raise "ERROR"
-        return self.unit.move_to_destination(path.path_list[-1])
+        move_target = path.path_list[-1]
+        # self.damage_map.reserve_position(move_target)
+        return self.unit.move_to_destination(move_target)
 
     def pickup_item_at_position(self):
         if self.assigned_move is not None:

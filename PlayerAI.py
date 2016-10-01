@@ -60,6 +60,7 @@ class PlayerAI:
                 agent.objectives.append(Objective(Objective.CONTROL_POINT, cp.position))
                 break
 
+
         for agent in self.agents:
             agent.do_move(world, enemy_units, friendly_units)
             if DUMP_OBJECTIVES or DUMP_ASSIGNED_MOVES:
