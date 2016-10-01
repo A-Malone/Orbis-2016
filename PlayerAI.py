@@ -10,12 +10,16 @@ from Objective import Objective
 DUMP_OBJECTIVES = True
 DUMP_ASSIGNED_MOVES = False
 
+from damage_map import DamageMap
+from astar import AStar
+
 
 class PlayerAI:
     def __init__(self):
         self.iterations = 0
         self.clearances = []
         self.agents = [Agent() for i in range(4)]
+        self.damage_map = DamageMap()
 
     def do_move(self, world, enemy_units, friendly_units):
         """
@@ -27,6 +31,7 @@ class PlayerAI:
         """
 
         self.update_agents(friendly_units)
+        self.damage_map.update_map(world, enemy_units)
 
         print("iteration: {}".format(self.iterations))
         if self.iterations == 0:
@@ -64,7 +69,8 @@ class PlayerAI:
             if DUMP_ASSIGNED_MOVES:
                 print('\t', agent.assigned_move)
 
-        self.iterations += 1
+
+    self.iterations += 1
 
     def update_agents(self, friendly_units):
         for a, f in zip(self.agents, friendly_units):
