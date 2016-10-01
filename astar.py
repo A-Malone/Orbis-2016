@@ -102,7 +102,7 @@ class AStar(object):
             # Short-circuit for the end
             if (current == end):
                 path_list = reconstruct_path(self.came_from, self.state_data_map, current)
-                while(path_list[-1] == start):
+                while(path_list and path_list[-1] == start):
                     path_list.pop()
                 path = Path(path_list, current_data.g)
                 break

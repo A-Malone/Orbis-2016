@@ -30,8 +30,8 @@ class PlayerAI:
         :param list[FriendlyUnit] friendly_units: An array of all 4 units on your team. Their order won't change.
         """
 
-        self.update_agents(friendly_units)
         self.damage_map.update_map(world, enemy_units)
+        self.update_agents(friendly_units)
 
         print("iteration: {}".format(self.iterations))
         if self.iterations == 0:
@@ -69,12 +69,11 @@ class PlayerAI:
             if DUMP_ASSIGNED_MOVES:
                 print('\t', agent.assigned_move)
 
-
-    self.iterations += 1
+        self.iterations += 1
 
     def update_agents(self, friendly_units):
         for a, f in zip(self.agents, friendly_units):
-            a.update(f)
+            a.update(f, self.damage_map)
 
 
 def get_max_clearance(world, x, y):

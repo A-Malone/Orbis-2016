@@ -8,7 +8,7 @@ class DamageMap(object):
     """ Object which stores a dictionary of position to (damage, range) pairs for use in threat analysis"""
 
     GAMMA = 0.9
-    MAX_TURN = 0
+    MAX_TURN = 5
 
     def __init__(self):
         pass
@@ -32,8 +32,7 @@ class DamageMap(object):
         for p0 in itertools.product(range(ex - 1, ex + 2), range(ey - 1, ey + 2)):            
             start_tile = world.get_tile(p0)
             if (start_tile and not start_tile.does_block_bullets()):
-                
-                """
+
                 # Pick direction
                 for dx, dy in itertools.product(range(- 1,2), range(-1,2)):
                     if(dx == dy == 0):
@@ -51,7 +50,6 @@ class DamageMap(object):
                                     break
                                 else:
                                     range_dict[p] = d
-                """
 
         # Update the cost map with the range values
         for p, k in range_dict:
