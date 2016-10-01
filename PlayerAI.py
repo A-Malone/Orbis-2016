@@ -3,10 +3,13 @@ from PythonClientAPI.libs.Game.Enums import *
 from PythonClientAPI.libs.Game.Entities import *
 from PythonClientAPI.libs.Game.World import *
 
+from damage_map import DamageMap
+from astar import AStar
+
 
 class PlayerAI:
     def __init__(self):
-        pass
+        self.damage_map = DamageMap()
 
     def do_move(self, world, enemy_units, friendly_units):
         """
@@ -16,4 +19,10 @@ class PlayerAI:
         :param list[EnemyUnit] enemy_units: An array of all 4 units on the enemy team. Their order won't change.
         :param list[FriendlyUnit] friendly_units: An array of all 4 units on your team. Their order won't change.
         """
-        pass
+        self.damage_map.update_map(world, enemy_units)
+
+        for unit in friendly_units:
+            if (unit.position != (1,1)):
+                astar = AStar()
+                path = astar.get_path(unit, unit.position, (1,1), self.damage_map)
+                unit.move_to_destination(path.path_list[-1])
