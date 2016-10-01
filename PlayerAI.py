@@ -70,7 +70,7 @@ class PlayerAI:
                 print('\t', agent.assigned_move)
 
 
-    self.iterations += 1
+        self.iterations += 1
 
     def update_agents(self, friendly_units):
         for a, f in zip(self.agents, friendly_units):

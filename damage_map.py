@@ -7,8 +7,8 @@ from PythonClientAPI.libs.Game.Enums import *
 class DamageMap(object):
     """ Object which stores a dictionary of position to (damage, range) pairs for use in threat analysis"""
 
-    GAMMA = 0.9
-    MAX_TURN = 0
+    GAMMA = 0.75
+    MAX_TURN = 6
 
     def __init__(self):
         pass
@@ -18,12 +18,13 @@ class DamageMap(object):
         self.width = world.width
         self.height = world.height
         self.world = world
+        self.unit_moves = set()
 
         for i, enemy in enumerate(enemy_units):
             self.accumulate_enemy_map(world, enemy)
 
     def accumulate_enemy_map(self, world, enemy):
-        range_dict = dict()        
+        range_dict = dict()
         ex, ey = enemy.position
         
         erange = WeaponType.get_range(enemy.current_weapon_type)
@@ -31,9 +32,8 @@ class DamageMap(object):
 
         for p0 in itertools.product(range(ex - 1, ex + 2), range(ey - 1, ey + 2)):            
             start_tile = world.get_tile(p0)
-            if (start_tile and not start_tile.does_block_bullets()):
+            if (start_tile and not start_tile.does_block_bullets()):                
                 
-                """
                 # Pick direction
                 for dx, dy in itertools.product(range(- 1,2), range(-1,2)):
                     if(dx == dy == 0):
@@ -51,7 +51,7 @@ class DamageMap(object):
                                     break
                                 else:
                                     range_dict[p] = d
-                """
+                
 
         # Update the cost map with the range values
         for p, k in range_dict:
@@ -70,4 +70,14 @@ class DamageMap(object):
         if (any((r <= weapon_range for (d,r) in tile_data))):
             damage_delta -= weapon_damage
 
-        return damage_delta*self.GAMMA**turn
+        return damage_delta*self.GAMMA**(turn-1)
+
+    def reserve_position(self, pos):
+        self.unit_moves.add(pos)
+
+    def can_move_to(self, pos):
+        tile = self.world.get_tile(pos)
+        if(tile):
+            return not (tile.blocks_movement() or pos in self.unit_moves)
+        else:
+            return False
