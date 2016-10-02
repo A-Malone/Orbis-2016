@@ -10,6 +10,7 @@ from objectives import *
 class Agent:
     def __init__(self):
         self.objectives = []
+        self.needs_weapon = True
 
     def update(self, friendly, enemy_units, damage_map, enemy_damage_counter_prediction):
         self.assigned_move = None

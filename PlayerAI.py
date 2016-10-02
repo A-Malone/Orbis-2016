@@ -116,17 +116,21 @@ class PlayerAI:
         # ---- ORDER AND ASSIGN OBJECTIVES
         # ----------------------------------------
 
-        # Prioritize picking up close weapons
+        # We used the weapon objectives many times, cache
+        weapon_objectives = list(filter(lambda x: isinstance(x, PickupObjective) and x.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), self.objectives))
+
+        # Prioritize picking up close weapons if we don't have one, and no one is going for it
         for agent in self.agents:
-            # Weapons
-            if (agent.current_weapon_type == WeaponType.MINI_BLASTER):
-                for weapon in filter(lambda x: x.pickup_type in (
-                        PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN),
-                                     world.pickups):
-                    weapon_obj = self.position_to_pickup_objective_map[weapon.position]
-                    if (not weapon_obj.agent_set and world.get_path_length(agent.position, weapon.position) <= PATH_PICKUP_DISTANCE):
+            # Check to see if we need a weapon
+            if (agent.needs_weapon):
+                # Look for close weapons
+                for weapon_obj in weapon_objectives:
+
+                    # Make sure this is a valid objective
+                    if (not weapon_obj.complete and not weapon_obj.agent_set and world.get_path_length(agent.position, weapon_obj.position) < 3):
                         agent.objectives.append(weapon_obj)
                         weapon_obj.agent_set.add(agent)
+                        agent.needs_weapon = False
                         break
                 continue
             # Repair Kits
@@ -143,6 +147,17 @@ class PlayerAI:
             for agent in sorted(filter(lambda a: len(a.objectives) == 0, self.agents),
                                 key=lambda a: world.get_path_length(a.position, obj.position)):
                 agent.objectives.append(obj)
+                obj.agent_set.add(agent)
+                break
+
+        # Assign agents that do not have an active objective to seek out weapons
+        weapon_objs = filter(lambda o: isinstance(o, PickupObjective) and o.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), self.objectives)
+        for obj in sorted(weapon_objs, key=lambda x: -x.net_score):
+            for agent in sorted(filter(lambda a: len(a.objectives) == 0 and a.needs_weapon, self.agents),
+                                key=lambda a: world.get_path_length(a.position, obj.position)):
+                agent.objectives.append(obj)
+                obj.agent_set.add(agent)
+                agent.needs_weapon = False
                 break
 
         # ---- DO OBJECTIVES
