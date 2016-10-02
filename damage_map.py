@@ -74,6 +74,6 @@ class DamageMap(object):
     def can_move_to(self, pos):
         tile = self.world.get_tile(pos)
         if(tile):
-            return not (tile.does_block_movement() or pos in self.unit_moves)
+            return not (tile.does_block_movement())
         else:
             return False
