@@ -86,11 +86,10 @@ class PlayerAI:
                 new_objs.append(PickupObjective(item.position, item.pickup_type))
 
         # Enemy Objectives
-        for item in world.pickups:
-            item_obj = self.position_to_objective_map.get(item.position, None)
-            if (not item_obj or item_obj.complete == True):                
-                new_objs.append(PickupObjective(item.position, item.pickup_type))
-
+        for i, enemy in enumerate(enemy_units):
+            enemy_obj = self.position_to_objective_map.get(enemy.position, None)
+            if (not enemy_obj or enemy_obj.complete == True):
+                new_objs.append(EnemyObjective(enemy.position, i))
 
         # Update objective scores, and perform update logic
         for obj in new_objs:
