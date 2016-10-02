@@ -5,6 +5,7 @@ from PythonClientAPI.libs.Game.World import *
 from astar import AStar
 from DamageCounter import DamageCounter
 from objectives import *
+import traceback
 
 
 class Agent:
@@ -13,80 +14,89 @@ class Agent:
         self.needs_weapon = True
 
     def update(self, friendly, enemy_units, damage_map, enemy_damage_counter_prediction):
-        self.assigned_move = None
+        try:
+            self.assigned_move = None
 
-        self.unit = friendly
-        # Inherit from friendly
-        self.position = friendly.position
-        self.team = friendly.team
-        self.call_sign = friendly.call_sign
-        self.current_weapon_type = friendly.current_weapon_type
-        self.health = friendly.health
-        self.last_move_result = friendly.last_move_result
-        self.last_shot_result = friendly.last_shot_result
-        self.last_pickup_result = friendly.last_pickup_result
-        self.last_shield_activation_result = friendly.last_shield_activation_result
-        self.damage_taken_last_turn = friendly.damage_taken_last_turn
+            self.unit = friendly
+            # Inherit from friendly
+            self.position = friendly.position
+            self.team = friendly.team
+            self.call_sign = friendly.call_sign
+            self.current_weapon_type = friendly.current_weapon_type
+            self.health = friendly.health
+            self.last_move_result = friendly.last_move_result
+            self.last_shot_result = friendly.last_shot_result
+            self.last_pickup_result = friendly.last_pickup_result
+            self.last_shield_activation_result = friendly.last_shield_activation_result
+            self.damage_taken_last_turn = friendly.damage_taken_last_turn
 
-        self.damage_map = damage_map
-        self.enemy_damage_counter_prediction = enemy_damage_counter_prediction
+            self.damage_map = damage_map
+            self.enemy_damage_counter_prediction = enemy_damage_counter_prediction
 
-        # Prepare to shoot if someone is in range, prioritizing low hp
-        for enemy in enemy_units:
-            shot_prediction = self.check_shot_against_enemy(enemy)
-            if shot_prediction == ShotResult.CAN_HIT_ENEMY and enemy.shielded_turns_remaining <= 0:
-                self.enemy_damage_counter_prediction[enemy.call_sign].add_damage(self)
+            # Prepare to shoot if someone is in range, prioritizing low hp
+            for enemy in enemy_units:
+                shot_prediction = self.check_shot_against_enemy(enemy)
+                if shot_prediction == ShotResult.CAN_HIT_ENEMY and enemy.shielded_turns_remaining <= 0:
+                    self.enemy_damage_counter_prediction[enemy.call_sign].add_damage(self)
+        except e:
+            traceback.print_exc()
 
     def update_objectives(self):
-        if not self.objectives:
-            return
+        try:
+            if not self.objectives:
+                return
 
-        # Remove complete objectives
-        self.objectives = [o for o in self.objectives if not o.complete]
+            # Remove complete objectives
+            self.objectives = [o for o in self.objectives if not o.complete]
+        except e:
+            traceback.print_exc()
 
     def do_objectives(self, world, enemy_units, friendly_units):
-        if self.health == 0:
-            return
-
-        # Shoot guaranteed kills
-        for dc in sorted(filter(lambda v: v.get_total_damage() > v.target.health,
-                                self.enemy_damage_counter_prediction.values()),
-                         key=lambda v: len(v.attackers)):
-            if self in dc.attackers:
-                self.shoot_at(dc.target)
-                return
-        # Shoot anything else in range that's not shielded
-        for dc in sorted(
-                filter(lambda v: v.target.shielded_turns_remaining <= 0, self.enemy_damage_counter_prediction.values()),
-                key=lambda v: len(v.attackers),
-                reverse=True):
-            if self in dc.attackers:
-                self.shoot_at(dc.target)
+        try:
+            if self.health == 0:
                 return
 
-        # Shield
-        if self.get_last_turn_shooters() and self.check_shield_activation() == ActivateShieldResult.SHIELD_ACTIVATION_VALID:
-            self.activate_shield()
-            return
-
-        # Work on the current objective
-        if len(self.objectives) > 0:
-            o = self.objectives[-1]
-            if (isinstance(o, AttackCapturePointObjective)):
-                self.move_to_destination(o.position)
-                return
-            elif isinstance(o, PickupObjective):
-                if self.position == o.position and self.check_pickup_result() == PickupResult.PICK_UP_VALID:
-                    self.pickup_item_at_position()
+            # Shoot guaranteed kills
+            for dc in sorted(filter(lambda v: v.get_total_damage() > v.target.health,
+                                    self.enemy_damage_counter_prediction.values()),
+                             key=lambda v: len(v.attackers)):
+                if self in dc.attackers:
+                    self.shoot_at(dc.target)
                     return
-                else:
+            # Shoot anything else in range that's not shielded
+            for dc in sorted(
+                    filter(lambda v: v.target.shielded_turns_remaining <= 0, self.enemy_damage_counter_prediction.values()),
+                    key=lambda v: len(v.attackers),
+                    reverse=True):
+                if self in dc.attackers:
+                    self.shoot_at(dc.target)
+                    return
+
+            # Shield
+            if self.get_last_turn_shooters() and self.check_shield_activation() == ActivateShieldResult.SHIELD_ACTIVATION_VALID:
+                self.activate_shield()
+                return
+
+            # Work on the current objective
+            if len(self.objectives) > 0:
+                o = self.objectives[-1]
+                if (isinstance(o, AttackCapturePointObjective)):
                     self.move_to_destination(o.position)
                     return
-        else:
-            for enemy in sorted(filter(lambda e: e.health != 0, enemy_units),
-                                key=lambda e: world.get_path_length(self.position, e.position)):
-                self.move_to_destination(enemy.position)
-                return
+                elif isinstance(o, PickupObjective):
+                    if self.position == o.position and self.check_pickup_result() == PickupResult.PICK_UP_VALID:
+                        self.pickup_item_at_position()
+                        return
+                    else:
+                        self.move_to_destination(o.position)
+                        return
+            else:
+                for enemy in sorted(filter(lambda e: e.health != 0, enemy_units),
+                                    key=lambda e: world.get_path_length(self.position, e.position)):
+                    self.move_to_destination(enemy.position)
+                    return
+        except e:
+            traceback.print_exc()
 
     def has_no_assigned_move(self):
         return self.assigned_move is None
@@ -123,7 +133,7 @@ class Agent:
             astar.closed_set.add(self.last_move_destination)
         path = astar.get_path(self, self.position, destination, self.damage_map)
         if not path or len(path.path_list) == 0:
-            raise ValueError("Invalid path")
+            traceback.print_tb()
         move_target = path.path_list[-1]
         # self.damage_map.reserve_position(move_target)
         self.assigned_move = "MOVE " + str(move_target)

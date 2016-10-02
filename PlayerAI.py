@@ -11,8 +11,9 @@ from DamageCounter import DamageCounter
 from objectives import *
 from damage_map import DamageMap
 from astar import AStar
+import traceback
 
-DUMP_OBJECTIVES = True
+DUMP_OBJECTIVES = False
 DUMP_ASSIGNED_MOVES = False
 MAP_OPENESS_AGGREGATE_THRESHOLD = 25
 # The number of steps out of its path an agent will go to get an objective
@@ -193,7 +194,7 @@ class PlayerAI:
     def get_control_point_by_position(self, world, pos):
         cp = world.get_nearest_control_point(pos)
         if cp.position != pos:
-            raise 'Invalid position for control point'
+            traceback.print_tb()
         return cp
 
     def get_max_clearance(self, world, x, y):
