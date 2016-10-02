@@ -46,12 +46,10 @@ class PlayerAI:
         #     pretty_print_matrix(self.clearances)
 
         # Update objective scores
-        for cp in world.control_points:
-            friendly_distances = sorted(0.5 ** world.get_path_length(f.position, cp.position) for f in friendly_units)
-            enemy_distances = sorted(0.5 ** world.get_path_length(e.position, cp.position) for e in enemy_units)
-            if cp.position not in self.objectives:
-                self.objectives[cp.position] = Objective(Objective.CONTROL_POINT, cp.position)
-            self.objectives[cp.position].score = sum(friendly_distances) - sum(enemy_distances)
+        for pos, obj in self.objectives.items():
+            friendly_distances = sorted(0.5 ** world.get_path_length(f.position, pos) for f in friendly_units)
+            enemy_distances = sorted(0.5 ** world.get_path_length(e.position, pos) for e in enemy_units)
+            obj.score = sum(friendly_distances) - sum(enemy_distances)
 
         # Mark completed objectives as completed
         to_delete = []
