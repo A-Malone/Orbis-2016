@@ -117,9 +117,8 @@ class PlayerAI:
         # Prioritize picking up close weapons if we don't have one
         for agent in self.agents:
             
-            # Check to see if we need a weapon
-            if (agent.current_weapon_type == WeaponType.MINI_BLASTER and (not agent.objectives or not isinstance(agent.objectives[-1], PickupObjective))):
-                
+            # Check to see if we need a weapon            
+            if (agent.needs_weapon):                
                 # Look for close weapons
                 for weapon in filter(lambda x: x.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), world.pickups):
                     weapon_obj = self.position_to_pickup_objective_map[weapon.position]
@@ -128,6 +127,7 @@ class PlayerAI:
                     if (not weapon_obj.complete and not weapon_obj.agent_set and world.get_path_length(agent.position, weapon.position) < 3):
                         agent.objectives.append(weapon_obj)
                         weapon_obj.agent_set.add(agent)
+                        agent.needs_weapon = False
                         break
 
         # Assign control point objectives
@@ -140,11 +140,12 @@ class PlayerAI:
 
         # Assign agents that do not have an active objective to seek out weapons
         weapon_objs = filter(lambda o: isinstance(o, PickupObjective) and o.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), self.objectives)
-        for obj in sorted(weapon_objs, key=lambda x: -x.net_score):
-            for agent in sorted(filter(lambda a: len(a.objectives) == 0, self.agents),
+        for obj in sorted(weapon_objs, key=lambda x: -x.net_score):            
+            for agent in sorted(filter(lambda a: len(a.objectives) == 0 and a.needs_weapon, self.agents),
                                 key=lambda a: world.get_path_length(a.position, obj.position)):
                 agent.objectives.append(obj)
                 obj.agent_set.add(agent)
+                agent.needs_weapon = False
                 break
 
         # ---- DO OBJECTIVES
