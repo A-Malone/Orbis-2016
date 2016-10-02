@@ -3,7 +3,7 @@ from PythonClientAPI.libs.Game.Enums import *
 from PythonClientAPI.libs.Game.Entities import *
 from PythonClientAPI.libs.Game.World import *
 from astar import AStar
-from Objective import Objective
+from objectives import *
 
 
 class Agent:
@@ -45,8 +45,9 @@ class Agent:
         if not self.objectives:
             return
 
+        # Work on the current objective
         o = self.objectives[-1]
-        if o.type == Objective.CONTROL_POINT:
+        if (isinstance(o, AttackCapturePointObjective)):
             self.move_to_destination(o.position)
 
     def has_no_assigned_move(self):
