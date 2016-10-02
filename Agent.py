@@ -22,9 +22,14 @@ class Agent:
 
         self.damage_map = damage_map
 
-    def do_move(self, world, enemy_units, friendly_units):
-        self.update_objectives(world, enemy_units, friendly_units)
+    def update_objectives(self):
+        if not self.objectives:
+            return
 
+        # Remove complete objectives
+        self.objectives = [o for o in self.objectives if not o.complete]
+
+    def do_objectives(self, world, enemy_units, friendly_units):
         # Shoot if someone is in range
         for enemy in enemy_units:
             shot_prediction = self.check_shot_against_enemy(enemy)
@@ -37,38 +42,6 @@ class Agent:
             self.pickup_item_at_position()
             return
 
-        # Move to objective
-        self.do_objectives(world, enemy_units, friendly_units)
-
-        # # Move to pick ups
-        # for pickup in sorted(world.pickups, key=lambda p: world.get_path_length(self.position, p.position)):
-        #     self.move_to_destination(pickup.position)
-        #     return
-        #
-        # # Move to enemy mainframe
-        # for enemy_mainframe in sorted(
-        #         filter(lambda c: c.is_mainframe and c.controlling_team != self.team, world.control_points),
-        #         key=lambda p: world.get_path_length(self.position, p.position)):
-        #     self.move_to_destination(enemy_mainframe.position)
-        #     return
-        #
-        # # Move to enemies
-        # for enemy in sorted(enemy_units, key=lambda e: world.get_path_length(self.position, e.position)):
-        #     self.move_to_destination(enemy.position)
-        #     return
-
-    def update_objectives(self, world, enemy_units, friendly_units):
-        if not self.objectives:
-            return
-
-        # Remove control points we already control
-        o = self.objectives[-1]
-        if o.type == Objective.CONTROL_POINT:
-            if world.get_nearest_control_point(o.position).controlling_team == self.team:
-                self.objectives.pop()
-                self.update_objectives(world, enemy_units, friendly_units)
-
-    def do_objectives(self, world, enemy_units, friendly_units):
         if not self.objectives:
             return
 

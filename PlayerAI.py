@@ -20,6 +20,7 @@ class PlayerAI:
         self.clearances = []
         self.agents = [Agent() for i in range(4)]
         self.damage_map = DamageMap()
+        self.objectives = {}
 
     def do_move(self, world, enemy_units, friendly_units):
         """
@@ -36,33 +37,44 @@ class PlayerAI:
         print("iteration: {}".format(self.iterations))
         if self.iterations == 0:
             self.team = friendly_units[0].team
-            self.clearances = [[0 for x in range(world.width)] for y in range(world.height)]
-            for x, y in itertools.product(range(world.width), range(world.height)):
-                tile_type = world.get_tile((x, y));
-                if tile_type == TileType.WALL:
-                    continue
-                self.clearances[y][x] = get_max_clearance(world, x, y)
-            pretty_print_matrix(self.clearances)
+        #     self.clearances = [[0 for x in range(world.width)] for y in range(world.height)]
+        #     for x, y in itertools.product(range(world.width), range(world.height)):
+        #         tile_type = world.get_tile((x, y));
+        #         if tile_type == TileType.WALL:
+        #             continue
+        #         self.clearances[y][x] = get_max_clearance(world, x, y)
+        #     pretty_print_matrix(self.clearances)
 
-        # Rank control points in terms of influence
-        control_point_scores = []
+        # Update objective scores
         for cp in world.control_points:
             friendly_distances = sorted(0.5 ** world.get_path_length(f.position, cp.position) for f in friendly_units)
             enemy_distances = sorted(0.5 ** world.get_path_length(e.position, cp.position) for e in enemy_units)
-            control_point_scores.append(
-                (cp, sum(friendly_distances) - sum(enemy_distances)))  # TODO: Figure out something better?
-        control_point_scores.sort(key=lambda c: c[1], reverse=True)
+            if cp.position not in self.objectives:
+                self.objectives[cp.position] = Objective(Objective.CONTROL_POINT, cp.position)
+            self.objectives[cp.position].score = sum(friendly_distances) - sum(enemy_distances)
 
+        # Mark completed objectives as completed
+        to_delete = []
+        for pos, obj in self.objectives.items():
+            if self.get_control_point_by_position(world, pos).controlling_team == self.team:
+                to_delete.append(pos)
+        for p in to_delete:
+            self.objectives[p].complete = True
+            del self.objectives[p]
+        for agent in self.agents:
+            agent.update_objectives()
+
+        # Assign objectives to agents
         # For each control point we have that isn't already ours, in order of influence
-        for cp, score in filter(lambda c: c[0].controlling_team != self.team, control_point_scores):
+        for pos, obj in filter(lambda o: o[1].type == Objective.CONTROL_POINT, self.objectives.items()):
             for agent in sorted(filter(lambda a: len(a.objectives) == 0, self.agents),
-                                key=lambda a: world.get_path_length(a.position, cp.position)):
-                agent.objectives.append(Objective(Objective.CONTROL_POINT, cp.position))
+                                key=lambda a: world.get_path_length(a.position, pos)):
+                agent.objectives.append(obj)
                 break
 
-
+        # Agents do what they have been assigned
         for agent in self.agents:
-            agent.do_move(world, enemy_units, friendly_units)
+            agent.do_objectives(world, enemy_units, friendly_units)
             if DUMP_OBJECTIVES or DUMP_ASSIGNED_MOVES:
                 print(agent.call_sign)
             if DUMP_OBJECTIVES:
@@ -75,6 +87,12 @@ class PlayerAI:
     def update_agents(self, friendly_units):
         for a, f in zip(self.agents, friendly_units):
             a.update(f, self.damage_map)
+
+    def get_control_point_by_position(self, world, pos):
+        cp = world.get_nearest_control_point(pos)
+        if cp.position != pos:
+            raise 'Invalid position for control point'
+        return cp
 
 
 def get_max_clearance(world, x, y):
