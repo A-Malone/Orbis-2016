@@ -3,15 +3,15 @@ from PythonClientAPI.libs.Game.Enums import *
 from PythonClientAPI.libs.Game.Entities import *
 from PythonClientAPI.libs.Game.World import *
 from astar import AStar
-from Objective import Objective
 from DamageCounter import DamageCounter
+from objectives import *
 
 
 class Agent:
     def __init__(self):
-        self.objectives = [Objective(Objective.WIN_GAME, None)]
+        self.objectives = []
 
-    def update(self, friendly, damage_map, enemy_damage_counter_prediction):
+    def update(self, friendly, enemy_units, damage_map, enemy_damage_counter_prediction):
         self.assigned_move = None
 
         self.unit = friendly
@@ -25,18 +25,18 @@ class Agent:
         self.damage_map = damage_map
         self.enemy_damage_counter_prediction = enemy_damage_counter_prediction
 
-    def update_objectives(self, enemy_units):
-        if not self.objectives:
-            return
-
-        # Remove complete objectives
-        self.objectives = [o for o in self.objectives if not o.complete]
-
         # Prepare to shoot if someone is in range, prioritizing low hp
         for enemy in enemy_units:
             shot_prediction = self.check_shot_against_enemy(enemy)
             if shot_prediction == ShotResult.CAN_HIT_ENEMY:
                 self.enemy_damage_counter_prediction[enemy.call_sign].add_damage(self)
+
+    def update_objectives(self):
+        if not self.objectives:
+            return
+
+        # Remove complete objectives
+        self.objectives = [o for o in self.objectives if not o.complete]
 
     def do_objectives(self, world, enemy_units, friendly_units):
         if self.health == 0:
@@ -67,13 +67,12 @@ class Agent:
             self.pickup_item_at_position()
             return
 
-        if not self.objectives:
-            return
-
-        o = self.objectives[-1]
-        if o.type == Objective.CONTROL_POINT:
-            self.move_to_destination(o.position)
-        elif o.type == Objective.WIN_GAME:
+        # Work on the current objective
+        if len(self.objectives) > 0:
+            o = self.objectives[-1]
+            if (isinstance(o, AttackCapturePointObjective)):
+                self.move_to_destination(o.position)
+        else:
             for enemy in sorted(filter(lambda e: e.health != 0, enemy_units),
                                 key=lambda e: world.get_path_length(self.position, e.position)):
                 self.move_to_destination(enemy.position)
