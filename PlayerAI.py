@@ -4,6 +4,7 @@ from PythonClientAPI.libs.Game.Entities import *
 from PythonClientAPI.libs.Game.World import *
 import itertools
 import time
+from collections import defaultdict
 
 from Agent import Agent
 from DamageCounter import DamageCounter
@@ -23,7 +24,10 @@ class PlayerAI:
         self.damage_map = DamageMap()
 
         self.objectives = []
-        self.position_to_objective_map = {}
+
+        self.position_to_cp_objective_map = {}
+        self.index_to_enemy_objective_map = {}
+        self.position_to_pickup_objective_map = {}
 
     def do_move(self, world, enemy_units, friendly_units):
         """
@@ -71,43 +75,58 @@ class PlayerAI:
 
         # Control point objectives
         for i, control_point in enumerate(world.control_points):
-            cp_obj = self.position_to_objective_map.get(control_point.position, None)
+            cp_obj = self.position_to_cp_objective_map.get(control_point.position, None)
             
             if (not cp_obj or cp_obj.complete == True):
                 if (control_point.controlling_team == self.team):
-                    new_objs.append(DefendCapturePointObjective(control_point.position, i))
+                    new_obj = DefendCapturePointObjective(control_point.position, i)
                 else:
-                    new_objs.append(AttackCapturePointObjective(control_point.position, i))
+                    new_obj = AttackCapturePointObjective(control_point.position, i)
+                new_objs.append(new_obj)
+                self.position_to_cp_objective_map[new_obj.position] = new_obj
 
         # Pickup Objectives
         for item in world.pickups:
-            item_obj = self.position_to_objective_map.get(item.position, None)
-            if (not item_obj or item_obj.complete == True):                
-                new_objs.append(PickupObjective(item.position, item.pickup_type))
+            item_obj = self.position_to_pickup_objective_map.get(item.position, None)
+            
+            if (not item_obj or item_obj.complete == True):
+                new_obj = PickupObjective(item.position, item.pickup_type)
+                self.position_to_pickup_objective_map[item.position] = new_obj
+                new_objs.append(new_obj)
 
         # Enemy Objectives
         for i, enemy in enumerate(enemy_units):
-            enemy_obj = self.position_to_objective_map.get(enemy.position, None)
+            enemy_obj = self.index_to_enemy_objective_map.get(i, None)            
+            
             if (not enemy_obj or enemy_obj.complete == True):
-                new_objs.append(EnemyObjective(enemy.position, i))
+                new_obj = EnemyObjective(enemy.position, i)
+                self.index_to_enemy_objective_map[i] = new_obj
+                new_objs.append(new_obj)
 
         # Update objective scores, and perform update logic
         for obj in new_objs:
-            obj.update(world, enemy_units, friendly_units)
-            self.position_to_objective_map[obj.position] = obj
+            obj.update(world, enemy_units, friendly_units)  
 
         self.objectives += new_objs
 
         # ---- ORDER AND ASSIGN OBJECTIVES
         # ----------------------------------------
 
+        # Prioritize picking up close weapons
+        for agent in agents:
+            if (agent.current_weapon_type == WeaponType.MINI_BLASTER):
+            for weapon in filter(lambda x: x.pickup_type >= PickupType.WEAPON_MINI_BLASTER,  world.pickups):
+                weapon_obj = self.position_to_pickup_objective_map[weapon.position]
+                if (not weapon_obj.agent_set and world.get_path_length(agent.position, weapon.position) < 3):
+                    agent.objectives.append(weapon_obj)
+                    weapon_obj.agent_set.add(agent)
+
         # Assign objectives to agents
         # For each control point we have that isn't already ours, in order of influence
-        for obj in filter(lambda o: isinstance(o, AttackCapturePointObjective), self.objectives):
-            for agent in sorted(filter(lambda a: len(a.objectives) == 0, self.agents),
-                                key=lambda a: world.get_path_length(a.position, obj.position)):
-                agent.objectives.append(obj)
-                break
+        #for obj in filter(lambda o: isinstance(o, AttackCapturePointObjective), self.objectives):
+        #    agent_iter = sorted(filter(lambda a: len(a.objectives) == 0, self.agents),
+        #                        key=lambda a: world.get_path_length(a.position, obj.position)):
+        #    next(agent_iter).objectives.append(obj)
 
         # ---- DO OBJECTIVES
         # ----------------------------------------
