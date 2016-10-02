@@ -12,8 +12,8 @@ from objectives import *
 from damage_map import DamageMap
 from astar import AStar
 
-DUMP_OBJECTIVES = False
-DUMP_ASSIGNED_MOVES = True
+DUMP_OBJECTIVES = True
+DUMP_ASSIGNED_MOVES = False
 MAP_OPENESS_AGGREGATE_THRESHOLD = 25
 
 
@@ -141,7 +141,6 @@ class PlayerAI:
         # ----------------------------------------
 
         # Agents do what they have been assigned
-        enemy_damage_counter = [0 for i in enemy_units]
         for agent in self.agents:
             agent.do_objectives(world, enemy_units, friendly_units)
             if DUMP_OBJECTIVES or DUMP_ASSIGNED_MOVES:
@@ -163,7 +162,6 @@ class PlayerAI:
         if cp.position != pos:
             raise 'Invalid position for control point'
         return cp
-
 
     def get_max_clearance(self, world, x, y):
         max_clearance = 0
