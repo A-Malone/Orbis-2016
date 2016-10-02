@@ -65,8 +65,7 @@ class PlayerAI:
             agent.update_objectives()
 
         # ---- IDENTIFY AND UPDATE NEW OBJECTIVES
-        # ----------------------------------------
-        # TODO: Add new objectives here
+        # ----------------------------------------        
 
         new_objs = []
 
@@ -80,14 +79,25 @@ class PlayerAI:
                 else:
                     new_objs.append(AttackCapturePointObjective(control_point.position, i))
 
+        # Pickup Objectives
+        for item in world.pickups:
+            item_obj = self.position_to_objective_map.get(item.position, None)
+            if (not item_obj or item_obj.complete == True):                
+                new_objs.append(PickupObjective(item.position, item.pickup_type))
+
+        # Enemy Objectives
+        for item in world.pickups:
+            item_obj = self.position_to_objective_map.get(item.position, None)
+            if (not item_obj or item_obj.complete == True):                
+                new_objs.append(PickupObjective(item.position, item.pickup_type))
+
+
         # Update objective scores, and perform update logic
         for obj in new_objs:
             obj.update(world, enemy_units, friendly_units)
             self.position_to_objective_map[obj.position] = obj
 
         self.objectives += new_objs
-
-        print("Objectives: {}".format(str([(type(x), x.position, x.complete) for x in self.objectives])))
 
         # ---- ORDER AND ASSIGN OBJECTIVES
         # ----------------------------------------
