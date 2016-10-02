@@ -21,6 +21,11 @@ class Agent:
         self.call_sign = friendly.call_sign
         self.current_weapon_type = friendly.current_weapon_type
         self.health = friendly.health
+        self.last_move_result = friendly.last_move_result
+        self.last_shot_result = friendly.last_shot_result
+        self.last_pickup_result = friendly.last_pickup_result
+        self.last_shield_activation_result = friendly.last_shield_activation_result
+        self.damage_taken_last_turn = friendly.damage_taken_last_turn
 
         self.damage_map = damage_map
         self.enemy_damage_counter_prediction = enemy_damage_counter_prediction
@@ -109,21 +114,19 @@ class Agent:
         self.assigned_move = "SHIELD"
         return self.unit.activate_shield()
 
-    def move(self, direction):
-        if self.assigned_move is not None:
-            raise "Assigned move to unit with move already!"
-        self.assigned_move = "MOVE " + str(direction)
-        return self.unit.move(direction)
-
     def move_to_destination(self, destination):
         # Custom A* implementation
         astar = AStar()
+        if self.last_move_result in [MoveResult.BLOCKED_BY_ENEMY, MoveResult.BLOCKED_BY_FRIENDLY,
+                                     MoveResult.BLOCKED_BY_WORLD]:
+            astar.closed_set.add(self.last_move_destination)
         path = astar.get_path(self, self.position, destination, self.damage_map)
         if not path or len(path.path_list) == 0:
             raise ValueError("Invalid path")
         move_target = path.path_list[-1]
         # self.damage_map.reserve_position(move_target)
         self.assigned_move = "MOVE " + str(move_target)
+        self.last_move_destination = move_target
         return self.unit.move_to_destination(move_target)
 
     def pickup_item_at_position(self):

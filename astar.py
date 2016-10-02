@@ -5,6 +5,7 @@ from functools import total_ordering
 import itertools
 import sys
 
+
 # Path cost
 def path_cost(path, damage_map):
     cost = 0
@@ -12,9 +13,11 @@ def path_cost(path, damage_map):
         cost += step_cost(None, state, damage_map, None)
     return cost
 
+
 # Cost of a single step
 def step_cost(unit, pos, damage_map, turn):
     return 1 + damage_map.cost(unit, pos, turn)
+
 
 def reconstruct_path(came_from, state_data_map, end):
     state = end
@@ -27,12 +30,15 @@ def reconstruct_path(came_from, state_data_map, end):
 
     return path
 
+
 class Path(object):
     """docstring for Path"""
+
     def __init__(self, path_list, cost):
         super(Path, self).__init__()
         self.path_list = path_list
         self.cost = cost
+
 
 @total_ordering
 class AStarData(object):
@@ -47,6 +53,7 @@ class AStarData(object):
 
     def __lt__(self, other):
         return self.f() < other.f()
+
 
 class AStar(object):
     """docstring for AStar"""
@@ -65,7 +72,7 @@ class AStar(object):
         self.state_data_map = {}
 
     def get_neighbours(self, state, damage_map):
-        for p in itertools.product(range(state[0]-1, state[0]+2), range(state[1]-1, state[1]+2)):            
+        for p in itertools.product(range(state[0] - 1, state[0] + 2), range(state[1] - 1, state[1] + 2)):
             if (damage_map.can_move_to(p)):
                 yield p
 
@@ -88,6 +95,8 @@ class AStar(object):
         self.open_set.add(start)
 
         path = None
+        best_candidate = None
+        best_candidate_data = None
 
         while (not self.open_queue.empty()):
             # Get the first item in the min-heap
@@ -98,12 +107,16 @@ class AStar(object):
             # Short-circuit for the end
             if (current == end):
                 path_list = reconstruct_path(self.came_from, self.state_data_map, current)
-                while(path_list and path_list[-1] == start):
+                while (path_list and path_list[-1] == start):
                     path_list.pop()
                 path = Path(path_list, current_data.g)
                 break
 
-            self.closed_set.add(current);
+            self.closed_set.add(current)
+            # Store best-so-far
+            if best_candidate is None or current_data.f() < best_candidate_data.f():
+                best_candidate = current
+                best_candidate_data = current_data
 
             for neighbour in self.get_neighbours(current, damage_map):
 
@@ -116,7 +129,7 @@ class AStar(object):
 
                 tentative_g_score = current_data.g + step_cost(unit, neighbour, damage_map, current_data.turn + 1)
                 if (neighbour in self.open_set and tentative_g_score >= neighbour_data.g):
-                    continue        # This is not a better path.
+                    continue  # This is not a better path.
 
                 # This path is the best until now. Record it!
                 self.came_from[neighbour] = current;
@@ -129,7 +142,12 @@ class AStar(object):
                     self.open_set.add(neighbour)
                     self.open_queue.put(neighbour_data)
 
-        if (path == None):
-            print("No solution")
+        if path == None and best_candidate:
+            # Partial path
+            path_list = reconstruct_path(self.came_from, self.state_data_map,
+                                         best_candidate)
+            while (path_list and path_list[-1] == start):
+                path_list.pop()
+            path = Path(path_list, best_candidate_data.g)
 
         return path
