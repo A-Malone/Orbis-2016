@@ -114,17 +114,19 @@ class PlayerAI:
         # ---- ORDER AND ASSIGN OBJECTIVES
         # ----------------------------------------
 
-        # Prioritize picking up close weapons if we don't have one
+        # We used the weapon objectives many times, cache
+        weapon_objectives = list(filter(lambda x: isinstance(x, PickupObjective) and x.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), self.objectives))
+        
+        # Prioritize picking up close weapons if we don't have one, and no one is going for it
         for agent in self.agents:
             
-            # Check to see if we need a weapon            
-            if (agent.needs_weapon):                
+            # Check to see if we need a weapon
+            if (agent.needs_weapon):
                 # Look for close weapons
-                for weapon in filter(lambda x: x.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), world.pickups):
-                    weapon_obj = self.position_to_pickup_objective_map[weapon.position]
+                for weapon_obj in weapon_objectives:
                     
                     # Make sure this is a valid objective
-                    if (not weapon_obj.complete and not weapon_obj.agent_set and world.get_path_length(agent.position, weapon.position) < 3):
+                    if (not weapon_obj.complete and not weapon_obj.agent_set and world.get_path_length(agent.position, weapon_obj.position) < 3):
                         agent.objectives.append(weapon_obj)
                         weapon_obj.agent_set.add(agent)
                         agent.needs_weapon = False
