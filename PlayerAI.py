@@ -6,9 +6,10 @@ import itertools
 import time
 from Agent import Agent
 from Objective import Objective
+from DamageCounter import DamageCounter
 
-DUMP_OBJECTIVES = True
-DUMP_ASSIGNED_MOVES = False
+DUMP_OBJECTIVES = False
+DUMP_ASSIGNED_MOVES = True
 
 from damage_map import DamageMap
 from astar import AStar
@@ -25,7 +26,7 @@ class PlayerAI:
     def do_move(self, world, enemy_units, friendly_units):
         """
         This method will get called every turn; Your glorious AI code goes here.
-        
+
         :param World world: The latest state of the world.
         :param list[EnemyUnit] enemy_units: An array of all 4 units on the enemy team. Their order won't change.
         :param list[FriendlyUnit] friendly_units: An array of all 4 units on your team. Their order won't change.
@@ -33,25 +34,26 @@ class PlayerAI:
 
         # ---- UPDATES
         # ----------------------------------------
-        self.damage_map.update_map(world, enemy_units) 
-        self.update_agents(friendly_units)
+        self.damage_map.update_map(world, enemy_units)
+        self.update_agents(enemy_units, friendly_units)
 
         print("iteration: {}".format(self.iterations))
         if self.iterations == 0:
             self.team = friendly_units[0].team
-        #     self.clearances = [[0 for x in range(world.width)] for y in range(world.height)]
-        #     for x, y in itertools.product(range(world.width), range(world.height)):
-        #         tile_type = world.get_tile((x, y));
-        #         if tile_type == TileType.WALL:
-        #             continue
-        #         self.clearances[y][x] = get_max_clearance(world, x, y)
-        #     pretty_print_matrix(self.clearances)
+            #     self.clearances = [[0 for x in range(world.width)] for y in range(world.height)]
+            #     for x, y in itertools.product(range(world.width), range(world.height)):
+            #         tile_type = world.get_tile((x, y));
+            #         if tile_type == TileType.WALL:
+            #             continue
+            #         self.clearances[y][x] = get_max_clearance(world, x, y)
+            #     pretty_print_matrix(self.clearances)
 
+            # ---- IDENTIFY NEW OBJECTIVES
+            # ----------------------------------------
 
-        # ---- UPDATE CURRENT OBJECTIVES
-        # ----------------------------------------
-
-         # Update objective scores
+            # ---- UPDATE CURRENT OBJECTIVES
+            # ----------------------------------------
+            # Update objective scores
         for pos, obj in self.objectives.items():
             friendly_distances = sorted(0.75 ** world.get_path_length(f.position, pos) for f in friendly_units)
             enemy_distances = sorted(0.75 ** world.get_path_length(e.position, pos) for e in enemy_units)
@@ -67,11 +69,7 @@ class PlayerAI:
             self.objectives[p].complete = True
             del self.objectives[p]
         for agent in self.agents:
-            agent.update_objectives()
-
-
-        # ---- IDENTIFY NEW OBJECTIVES
-        # ----------------------------------------
+            agent.update_objectives(enemy_units)
 
         # ---- ORDER OBJECTIVES
         # ----------------------------------------
@@ -87,11 +85,11 @@ class PlayerAI:
                 agent.objectives.append(obj)
                 break
 
-
         # ---- DO OBJECTIVES
         # ----------------------------------------
 
         # Agents do what they have been assigned
+        enemy_damage_counter = [0 for i in enemy_units]
         for agent in self.agents:
             agent.do_objectives(world, enemy_units, friendly_units)
             if DUMP_OBJECTIVES or DUMP_ASSIGNED_MOVES:
@@ -103,9 +101,10 @@ class PlayerAI:
 
         self.iterations += 1
 
-    def update_agents(self, friendly_units):
+    def update_agents(self, enemy_units, friendly_units):
+        enemy_damage_counter_prediction = {e.call_sign: DamageCounter(e) for e in enemy_units}
         for a, f in zip(self.agents, friendly_units):
-            a.update(f, self.damage_map)
+            a.update(f, self.damage_map, enemy_damage_counter_prediction)
 
     def get_control_point_by_position(self, world, pos):
         cp = world.get_nearest_control_point(pos)
