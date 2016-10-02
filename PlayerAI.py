@@ -16,7 +16,7 @@ DUMP_OBJECTIVES = True
 DUMP_ASSIGNED_MOVES = False
 MAP_OPENESS_AGGREGATE_THRESHOLD = 25
 # The number of steps out of its path an agent will go to get an objective
-PATH_PICKUP_DISTANCE = 3
+PATH_PICKUP_DISTANCE = 4
 
 
 class PlayerAI:
@@ -54,6 +54,8 @@ class PlayerAI:
                 self.clearances[y][x] = self.get_max_clearance(world, x, y)
             self.map_openess_aggregate = sum(map(lambda x: sum(n ** 2 for n in x), self.clearances)) / sum(
                 map(len, self.clearances))
+
+            print("OPENNESS " + str(self.map_openess_aggregate))
 
         # ---- UPDATES
         # ----------------------------------------
@@ -117,22 +119,30 @@ class PlayerAI:
         # ----------------------------------------
 
         # We used the weapon objectives many times, cache
-        weapon_objectives = list(filter(lambda x: isinstance(x, PickupObjective) and x.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), self.objectives))
+        weapon_objectives = filter(
+            lambda x: isinstance(x, PickupObjective) and x.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), 
+            self.objectives)
 
-        # Prioritize picking up close weapons if we don't have one, and no one is going for it
+        # Prioritize picking up weapons on the way if we don't have one, and no one is going for it
+        
         for agent in self.agents:
-            # Check to see if we need a weapon
-            if (agent.needs_weapon):
+            # Check to see if we need a weapon and already have an objective
+            if (agent.needs_weapon and agent.objectives):
+                last_objective = agent.objectives[-1]
+
                 # Look for close weapons
-                for weapon_obj in weapon_objectives:
+                for weapon_obj in sorted(weapon_objectives, key=lambda x: -x.net_score*self.weapon_priority(x.pickup_type)):
 
                     # Make sure this is a valid objective
-                    if (not weapon_obj.complete and not weapon_obj.agent_set and world.get_path_length(agent.position, weapon_obj.position) < 3):
-                        agent.objectives.append(weapon_obj)
-                        weapon_obj.agent_set.add(agent)
-                        agent.needs_weapon = False
-                        break
+                    if (not weapon_obj.complete and not weapon_obj.agent_set):
+                        path_delta = world.get_path_length(agent.position, weapon_obj.position) +  world.get_path_length(weapon_obj.position, last_objective.position) - world.get_path_length(agent.position, last_objective.position)
+                        if (path_delta < PATH_PICKUP_DISTANCE):
+                            agent.objectives.append(weapon_obj)
+                            weapon_obj.agent_set.add(agent)
+                            agent.needs_weapon = False
+                            break
                 continue
+            
             # Repair Kits
             for repair_kit in filter(lambda x: x.pickup_type == PickupType.REPAIR_KIT, world.pickups):
                 repair_obj = self.position_to_pickup_objective_map[repair_kit.position]
@@ -152,7 +162,7 @@ class PlayerAI:
 
         # Assign agents that do not have an active objective to seek out weapons
         weapon_objs = filter(lambda o: isinstance(o, PickupObjective) and o.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), self.objectives)
-        for obj in sorted(weapon_objs, key=lambda x: -x.net_score):
+        for obj in sorted(weapon_objs, key=lambda x: -x.net_score*self.weapon_priority(x.pickup_type)):
             for agent in sorted(filter(lambda a: len(a.objectives) == 0 and a.needs_weapon, self.agents),
                                 key=lambda a: world.get_path_length(a.position, obj.position)):
                 agent.objectives.append(obj)
@@ -196,3 +206,19 @@ class PlayerAI:
                 this_clearance += 1
             max_clearance = max(max_clearance, this_clearance - 1)
         return max_clearance
+
+    def weapon_priority(self, pickup_type):
+        if (self.map_openess_aggregate > MAP_OPENESS_AGGREGATE_THRESHOLD):
+            if pickup_type == PickupType.WEAPON_SCATTER_GUN:
+                return 0.1
+            elif pickup_type == PickupType.WEAPON_RAIL_GUN:
+                return 10
+            else:
+                return 1
+        elif self.map_openess_aggregate < MAP_OPENESS_AGGREGATE_THRESHOLD / 2:
+            if pickup_type == PickupType.WEAPON_SCATTER_GUN:
+                return 10
+            else:
+                return 1
+        else:
+            return 1
