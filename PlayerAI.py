@@ -47,15 +47,16 @@ class PlayerAI:
 
         # Update objective scores
         for pos, obj in self.objectives.items():
-            friendly_distances = sorted(0.5 ** world.get_path_length(f.position, pos) for f in friendly_units)
-            enemy_distances = sorted(0.5 ** world.get_path_length(e.position, pos) for e in enemy_units)
+            friendly_distances = sorted(0.75 ** world.get_path_length(f.position, pos) for f in friendly_units)
+            enemy_distances = sorted(0.75 ** world.get_path_length(e.position, pos) for e in enemy_units)
             obj.score = sum(friendly_distances) - sum(enemy_distances)
 
         # Mark completed objectives as completed
         to_delete = []
         for pos, obj in self.objectives.items():
-            if self.get_control_point_by_position(world, pos).controlling_team == self.team:
-                to_delete.append(pos)
+            if obj.type == Objective.CONTROL_POINT:
+                if self.get_control_point_by_position(world, pos).controlling_team == self.team:
+                    to_delete.append(pos)
         for p in to_delete:
             self.objectives[p].complete = True
             del self.objectives[p]

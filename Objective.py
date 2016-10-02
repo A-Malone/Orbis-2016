@@ -7,8 +7,7 @@ from PythonClientAPI.libs.Game.World import *
 class Objective():
     CONTROL_POINT = 0
     PICK_UP = 1
-
-    _names = {CONTROL_POINT: 'Control Point', PICK_UP: 'Pick up'}
+    WIN_GAME = 2
 
     def __init__(self, type, position):
         self.type = type
@@ -17,5 +16,7 @@ class Objective():
         self.complete = False
 
     def __repr__(self):
-        return str(self._names[self.type]) + ' ' + str(self.position) + ' ' + str(
+        _names = {Objective.CONTROL_POINT: 'Control Point', Objective.PICK_UP: 'Pick up',
+                  Objective.WIN_GAME: 'Win game'}
+        return str(_names[self.type]) + ' ' + (str(self.position) if self.position else '') + ' ' + str(
             self.score) + (' Complete' if self.complete else '')

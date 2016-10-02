@@ -8,7 +8,7 @@ from Objective import Objective
 
 class Agent:
     def __init__(self):
-        self.objectives = []
+        self.objectives = [Objective(Objective.WIN_GAME, None)]
 
     def update(self, friendly, damage_map):
         self.assigned_move = None
@@ -19,6 +19,7 @@ class Agent:
         self.team = friendly.team
         self.call_sign = friendly.call_sign
         self.current_weapon_type = friendly.current_weapon_type
+        self.health = friendly.health
 
         self.damage_map = damage_map
 
@@ -30,12 +31,19 @@ class Agent:
         self.objectives = [o for o in self.objectives if not o.complete]
 
     def do_objectives(self, world, enemy_units, friendly_units):
+        if self.health == 0:
+            return
+
         # Shoot if someone is in range
         for enemy in enemy_units:
             shot_prediction = self.check_shot_against_enemy(enemy)
             if shot_prediction == ShotResult.CAN_HIT_ENEMY:
                 self.shoot_at(enemy)
                 return
+
+        if self.get_last_turn_shooters() and self.check_shield_activation() == ActivateShieldResult.SHIELD_ACTIVATION_VALID:
+            self.activate_shield()
+            return
 
         # Pick up what you're standing on
         if self.check_pickup_result() == PickupResult.PICK_UP_VALID:
@@ -48,6 +56,10 @@ class Agent:
         o = self.objectives[-1]
         if o.type == Objective.CONTROL_POINT:
             self.move_to_destination(o.position)
+        elif o.type == Objective.WIN_GAME:
+            for enemy in sorted(enemy_units, key=lambda e: world.get_path_length(self.position, e.position)):
+                self.move_to_destination(enemy.position)
+                return
 
     def has_no_assigned_move(self):
         return self.assigned_move is None
