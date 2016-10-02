@@ -58,8 +58,7 @@ class PlayerAI:
             obj.update(world, enemy_units, friendly_units)
 
         # Filter out complete objectives
-        self.objectives = [x for x in self.objectives if not x.complete]
-        
+        self.objectives = [x for x in self.objectives if not x.complete]         
         
         for agent in self.agents:
             agent.update_objectives()
@@ -71,20 +70,23 @@ class PlayerAI:
         new_objs = []
 
         # Control point objectives
-        for control_point in world.control_points:
+        for i, control_point in enumerate(world.control_points):
             cp_obj = self.position_to_objective_map.get(control_point.position, None)
             
-            if (not cp_obj or cp_obj.complete == True):                
+            if (not cp_obj or cp_obj.complete == True):
                 if (control_point.controlling_team == self.team):
-                    new_objs.append(DefendCapturePointObjective(control_point))
+                    new_objs.append(DefendCapturePointObjective(control_point.position, i))
                 else:
-                    new_objs.append(AttackCapturePointObjective(control_point))
+                    new_objs.append(AttackCapturePointObjective(control_point.position, i))
 
         # Update objective scores, and perform update logic
         for obj in new_objs:
             obj.update(world, enemy_units, friendly_units)
+            self.position_to_objective_map[obj.position] = obj
 
-        self.objectives += new_objs        
+        self.objectives += new_objs
+
+        print("Objectives: {}".format(str([(type(x), x.position, x.complete) for x in self.objectives])))
 
         # ---- ORDER AND ASSIGN OBJECTIVES
         # ----------------------------------------
@@ -96,7 +98,6 @@ class PlayerAI:
                                 key=lambda a: world.get_path_length(a.position, obj.position)):
                 agent.objectives.append(obj)
                 break
-
 
         # ---- DO OBJECTIVES
         # ----------------------------------------

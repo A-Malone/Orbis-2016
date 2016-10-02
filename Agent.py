@@ -88,7 +88,8 @@ class Agent:
         astar = AStar()
         path = astar.get_path(self, self.position, destination, self.damage_map)
         if not path or len(path.path_list) == 0:
-            raise "ERROR"
+            print([(x.complete, x.position) for x in self.objectives])
+            raise ValueError("Invalid path")
         move_target = path.path_list[-1]
         # self.damage_map.reserve_position(move_target)
         return self.unit.move_to_destination(move_target)
