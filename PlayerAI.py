@@ -31,7 +31,9 @@ class PlayerAI:
         :param list[FriendlyUnit] friendly_units: An array of all 4 units on your team. Their order won't change.
         """
 
-        self.damage_map.update_map(world, enemy_units)
+        # ---- UPDATES
+        # ----------------------------------------
+        self.damage_map.update_map(world, enemy_units) 
         self.update_agents(friendly_units)
 
         print("iteration: {}".format(self.iterations))
@@ -45,7 +47,11 @@ class PlayerAI:
         #         self.clearances[y][x] = get_max_clearance(world, x, y)
         #     pretty_print_matrix(self.clearances)
 
-        # Update objective scores
+
+        # ---- UPDATE CURRENT OBJECTIVES
+        # ----------------------------------------
+
+         # Update objective scores
         for pos, obj in self.objectives.items():
             friendly_distances = sorted(0.5 ** world.get_path_length(f.position, pos) for f in friendly_units)
             enemy_distances = sorted(0.5 ** world.get_path_length(e.position, pos) for e in enemy_units)
@@ -62,6 +68,16 @@ class PlayerAI:
         for agent in self.agents:
             agent.update_objectives()
 
+
+        # ---- IDENTIFY NEW OBJECTIVES
+        # ----------------------------------------
+
+        # ---- ORDER OBJECTIVES
+        # ----------------------------------------
+
+        # ---- ASSIGN OBJECTIVES
+        # ----------------------------------------
+
         # Assign objectives to agents
         # For each control point we have that isn't already ours, in order of influence
         for pos, obj in filter(lambda o: o[1].type == Objective.CONTROL_POINT, self.objectives.items()):
@@ -69,6 +85,10 @@ class PlayerAI:
                                 key=lambda a: world.get_path_length(a.position, pos)):
                 agent.objectives.append(obj)
                 break
+
+
+        # ---- DO OBJECTIVES
+        # ----------------------------------------
 
         # Agents do what they have been assigned
         for agent in self.agents:
