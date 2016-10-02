@@ -11,8 +11,9 @@ from DamageCounter import DamageCounter
 from objectives import *
 from damage_map import DamageMap
 from astar import AStar
+import traceback
 
-DUMP_OBJECTIVES = True
+DUMP_OBJECTIVES = False
 DUMP_ASSIGNED_MOVES = False
 MAP_OPENESS_AGGREGATE_THRESHOLD = 25
 # The number of steps out of its path an agent will go to get an objective
@@ -121,26 +122,26 @@ class PlayerAI:
 
         # Prioritize picking up close weapons if we don't have one, and no one is going for it
         for agent in self.agents:
-            # Check to see if we need a weapon
-            if (agent.needs_weapon):
-                # Look for close weapons
-                for weapon_obj in weapon_objectives:
+                # Check to see if we need a weapon
+                if (agent.needs_weapon):
+                    # Look for close weapons
+                    for weapon_obj in weapon_objectives:
 
-                    # Make sure this is a valid objective
-                    if (not weapon_obj.complete and not weapon_obj.agent_set and world.get_path_length(agent.position, weapon_obj.position) < 3):
-                        agent.objectives.append(weapon_obj)
-                        weapon_obj.agent_set.add(agent)
-                        agent.needs_weapon = False
+                        # Make sure this is a valid objective
+                        if (not weapon_obj.complete and not weapon_obj.agent_set and world.get_path_length(agent.position, weapon_obj.position) < 3):
+                            agent.objectives.append(weapon_obj)
+                            weapon_obj.agent_set.add(agent)
+                            agent.needs_weapon = False
+                            break
+                    continue
+                # Repair Kits
+                for repair_kit in filter(lambda x: x.pickup_type == PickupType.REPAIR_KIT, world.pickups):
+                    repair_obj = self.position_to_pickup_objective_map[repair_kit.position]
+                    if (not repair_obj.agent_set and world.get_path_length(agent.position,
+                                                                           repair_kit.position) <= PATH_PICKUP_DISTANCE):
+                        agent.objectives.append(repair_obj)
+                        repair_obj.agent_set.add(agent)
                         break
-                continue
-            # Repair Kits
-            for repair_kit in filter(lambda x: x.pickup_type == PickupType.REPAIR_KIT, world.pickups):
-                repair_obj = self.position_to_pickup_objective_map[repair_kit.position]
-                if (not repair_obj.agent_set and world.get_path_length(agent.position,
-                                                                       repair_kit.position) <= PATH_PICKUP_DISTANCE):
-                    agent.objectives.append(repair_obj)
-                    repair_obj.agent_set.add(agent)
-                    break
 
         # Assign control point objectives
         for obj in filter(lambda o: isinstance(o, AttackCapturePointObjective), self.objectives):
@@ -183,7 +184,7 @@ class PlayerAI:
     def get_control_point_by_position(self, world, pos):
         cp = world.get_nearest_control_point(pos)
         if cp.position != pos:
-            raise 'Invalid position for control point'
+            traceback.print_tb()
         return cp
 
     def get_max_clearance(self, world, x, y):

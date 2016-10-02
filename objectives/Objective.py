@@ -17,9 +17,12 @@ class Objective():
         self.complete = False
 
     def update(self, world, enemy_units, friendly_units):
-        friendly_distances = (0.5 ** world.get_path_length(f.position, self.position) for f in friendly_units)
-        enemy_distances = (0.5 ** world.get_path_length(e.position, self.position) for e in enemy_units)
+        try:
+            friendly_distances = (0.5 ** world.get_path_length(f.position, self.position) for f in friendly_units)
+            enemy_distances = (0.5 ** world.get_path_length(e.position, self.position) for e in enemy_units)
 
-        self.friendly_score = sum(friendly_distances)
-        self.enemy_score = sum(enemy_distances)
-        self.net_score =  self.friendly_score - self.enemy_score
+            self.friendly_score = sum(friendly_distances)
+            self.enemy_score = sum(enemy_distances)
+            self.net_score =  self.friendly_score - self.enemy_score
+        except e:
+            traceback.print_exc()
