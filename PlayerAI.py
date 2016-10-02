@@ -114,7 +114,7 @@ class PlayerAI:
         # ---- ORDER AND ASSIGN OBJECTIVES
         # ----------------------------------------
 
-        # Prioritize picking up close weapons
+        # Prioritize picking up close weapons if we don't have one
         for agent in self.agents:
             
             # Check to see if we need a weapon
@@ -135,6 +135,16 @@ class PlayerAI:
             for agent in sorted(filter(lambda a: len(a.objectives) == 0, self.agents),
                                 key=lambda a: world.get_path_length(a.position, obj.position)):
                 agent.objectives.append(obj)
+                obj.agent_set.add(agent)
+                break
+
+        # Assign agents that do not have an active objective to seek out weapons
+        weapon_objs = filter(lambda o: isinstance(o, PickupObjective) and o.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), self.objectives)
+        for obj in sorted(weapon_objs, key=lambda x: -x.net_score):
+            for agent in sorted(filter(lambda a: len(a.objectives) == 0, self.agents),
+                                key=lambda a: world.get_path_length(a.position, obj.position)):
+                agent.objectives.append(obj)
+                obj.agent_set.add(agent)
                 break
 
         # ---- DO OBJECTIVES
