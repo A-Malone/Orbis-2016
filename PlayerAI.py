@@ -13,6 +13,7 @@ from astar import AStar
 
 DUMP_OBJECTIVES = False
 DUMP_ASSIGNED_MOVES = True
+MAP_OPENESS_AGGREGATE_THRESHOLD = 25
 
 
 class PlayerAI:
@@ -34,7 +35,7 @@ class PlayerAI:
         :param list[FriendlyUnit] friendly_units: An array of all 4 units on your team. Their order won't change.
         """
 
-        # ---- UPDATES
+        # ---- First time map analysis
         # ----------------------------------------
         print("iteration: {}".format(self.iterations))
         if self.iterations == 0:
@@ -46,10 +47,14 @@ class PlayerAI:
                     continue
                 self.clearances[y][x] = get_max_clearance(world, x, y)
             pretty_print_matrix(self.clearances)
-            print(sum(map(sum, self.clearances)) / sum(map(len, self.clearances)))
+            self.map_openess_aggregate = sum(map(lambda x: sum(n ** 2 for n in x), self.clearances)) / sum(map(len, self.clearances))
+            if self.map_openess_aggregate >= MAP_OPENESS_AGGREGATE_THRESHOLD:
+                pass
 
-            self.damage_map.update_map(world, enemy_units)
-            self.update_agents(enemy_units, friendly_units)
+        # ---- UPDATES
+        # ----------------------------------------
+        self.damage_map.update_map(world, enemy_units)
+        self.update_agents(enemy_units, friendly_units)
 
         # ---- UPDATE CURRENT OBJECTIVES
         # ----------------------------------------
