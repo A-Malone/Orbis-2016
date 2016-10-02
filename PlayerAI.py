@@ -116,12 +116,19 @@ class PlayerAI:
 
         # Prioritize picking up close weapons
         for agent in self.agents:
-            if (agent.current_weapon_type == WeaponType.MINI_BLASTER):
+            
+            # Check to see if we need a weapon
+            if (agent.current_weapon_type == WeaponType.MINI_BLASTER and (not agent.objectives or not isinstance(agent.objectives[-1], PickupObjective)):
+                
+                # Look for close weapons
                 for weapon in filter(lambda x: x.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), world.pickups):
                     weapon_obj = self.position_to_pickup_objective_map[weapon.position]
-                    if (not weapon_obj.agent_set and world.get_path_length(agent.position, weapon.position) < 3):
+                    
+                    # Make sure this is a valid objective
+                    if (not weapon_obj.complete and not weapon_obj.agent_set and world.get_path_length(agent.position, weapon.position) < 3):
                         agent.objectives.append(weapon_obj)
                         weapon_obj.agent_set.add(agent)
+                        break
 
         # Assign control point objectives
         for obj in filter(lambda o: isinstance(o, AttackCapturePointObjective), self.objectives):
