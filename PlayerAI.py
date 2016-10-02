@@ -118,7 +118,7 @@ class PlayerAI:
         for agent in self.agents:
             
             # Check to see if we need a weapon
-            if (agent.current_weapon_type == WeaponType.MINI_BLASTER and (not agent.objectives or not isinstance(agent.objectives[-1], PickupObjective)):
+            if (agent.current_weapon_type == WeaponType.MINI_BLASTER and (not agent.objectives or not isinstance(agent.objectives[-1], PickupObjective))):
                 
                 # Look for close weapons
                 for weapon in filter(lambda x: x.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), world.pickups):
