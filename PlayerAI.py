@@ -39,17 +39,17 @@ class PlayerAI:
         print("iteration: {}".format(self.iterations))
         if self.iterations == 0:
             self.team = friendly_units[0].team
-        # self.clearances = [[0 for x in range(world.width)] for y in range(world.height)]
-        #     for x, y in itertools.product(range(world.width), range(world.height)):
-        #         tile_type = world.get_tile((x, y));
-        #         if tile_type == TileType.WALL:
-        #             continue
-        #         self.clearances[y][x] = get_max_clearance(world, x, y)
-        #     pretty_print_matrix(self.clearances)
+            self.clearances = [[0 for x in range(world.width)] for y in range(world.height)]
+            for x, y in itertools.product(range(world.width), range(world.height)):
+                tile_type = world.get_tile((x, y));
+                if tile_type == TileType.WALL:
+                    continue
+                self.clearances[y][x] = get_max_clearance(world, x, y)
+            pretty_print_matrix(self.clearances)
+            print(sum(map(sum, self.clearances)) / sum(map(len, self.clearances)))
 
-
-        self.damage_map.update_map(world, enemy_units)
-        self.update_agents(enemy_units, friendly_units)
+            self.damage_map.update_map(world, enemy_units)
+            self.update_agents(enemy_units, friendly_units)
 
         # ---- UPDATE CURRENT OBJECTIVES
         # ----------------------------------------
@@ -59,8 +59,8 @@ class PlayerAI:
             obj.update(world, enemy_units, friendly_units)
 
         # Filter out complete objectives
-        self.objectives = [x for x in self.objectives if not x.complete]         
-        
+        self.objectives = [x for x in self.objectives if not x.complete]
+
         for agent in self.agents:
             agent.update_objectives()
 
@@ -72,7 +72,7 @@ class PlayerAI:
         # Control point objectives
         for i, control_point in enumerate(world.control_points):
             cp_obj = self.position_to_objective_map.get(control_point.position, None)
-            
+
             if (not cp_obj or cp_obj.complete == True):
                 if (control_point.controlling_team == self.team):
                     new_objs.append(DefendCapturePointObjective(control_point.position, i))
@@ -82,15 +82,14 @@ class PlayerAI:
         # Pickup Objectives
         for item in world.pickups:
             item_obj = self.position_to_objective_map.get(item.position, None)
-            if (not item_obj or item_obj.complete == True):                
+            if (not item_obj or item_obj.complete == True):
                 new_objs.append(PickupObjective(item.position, item.pickup_type))
 
         # Enemy Objectives
         for item in world.pickups:
             item_obj = self.position_to_objective_map.get(item.position, None)
-            if (not item_obj or item_obj.complete == True):                
+            if (not item_obj or item_obj.complete == True):
                 new_objs.append(PickupObjective(item.position, item.pickup_type))
-
 
         # Update objective scores, and perform update logic
         for obj in new_objs:

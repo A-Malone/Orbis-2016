@@ -28,7 +28,7 @@ class Agent:
         # Prepare to shoot if someone is in range, prioritizing low hp
         for enemy in enemy_units:
             shot_prediction = self.check_shot_against_enemy(enemy)
-            if shot_prediction == ShotResult.CAN_HIT_ENEMY:
+            if shot_prediction == ShotResult.CAN_HIT_ENEMY and enemy.shielded_turns_remaining <= 0:
                 self.enemy_damage_counter_prediction[enemy.call_sign].add_damage(self)
 
     def update_objectives(self):
@@ -43,21 +43,22 @@ class Agent:
             return
 
         # Shoot guaranteed kills
-        for enemy_callsign, dc in sorted(filter(lambda v: v[1].get_total_damage() > v[1].target.health,
-                                                self.enemy_damage_counter_prediction.items()),
-                                         key=lambda v: len(v[1].attackers)):
+        for dc in sorted(filter(lambda v: v.get_total_damage() > v.target.health,
+                                self.enemy_damage_counter_prediction.values()),
+                         key=lambda v: len(v.attackers)):
+            if self in dc.attackers:
+                self.shoot_at(dc.target)
+                return
+        # Shoot anything else in range that's not shielded
+        for dc in sorted(
+                filter(lambda v: v.target.shielded_turns_remaining <= 0, self.enemy_damage_counter_prediction.values()),
+                key=lambda v: len(v.attackers),
+                reverse=True):
             if self in dc.attackers:
                 self.shoot_at(dc.target)
                 return
 
-        # Shoot anything else in range
-        for enemy_callsign, dc in sorted(self.enemy_damage_counter_prediction.items(),
-                                         key=lambda v: len(v[1].attackers),
-                                         reverse=True):
-            if self in dc.attackers:
-                self.shoot_at(dc.target)
-                return
-
+        # Shield
         if self.get_last_turn_shooters() and self.check_shield_activation() == ActivateShieldResult.SHIELD_ACTIVATION_VALID:
             self.activate_shield()
             return
@@ -115,7 +116,7 @@ class Agent:
         # Custom A* implementation
         astar = AStar()
         path = astar.get_path(self, self.position, destination, self.damage_map)
-        if not path or len(path.path_list) == 0:            
+        if not path or len(path.path_list) == 0:
             raise ValueError("Invalid path")
         move_target = path.path_list[-1]
         # self.damage_map.reserve_position(move_target)
