@@ -12,8 +12,8 @@ from objectives import *
 from damage_map import DamageMap
 from astar import AStar
 
-DUMP_OBJECTIVES = False
-DUMP_ASSIGNED_MOVES = True
+DUMP_OBJECTIVES = True
+DUMP_ASSIGNED_MOVES = False
 MAP_OPENESS_AGGREGATE_THRESHOLD = 25
 
 
@@ -117,11 +117,14 @@ class PlayerAI:
         # Prioritize picking up close weapons
         for agent in self.agents:
             if (agent.current_weapon_type == WeaponType.MINI_BLASTER):
-                for weapon in filter(lambda x: x.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), world.pickups):
+                for weapon in filter(lambda x: x.pickup_type in (
+                PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN),
+                                     world.pickups):
                     weapon_obj = self.position_to_pickup_objective_map[weapon.position]
                     if (not weapon_obj.agent_set and world.get_path_length(agent.position, weapon.position) < 3):
                         agent.objectives.append(weapon_obj)
                         weapon_obj.agent_set.add(agent)
+                        break
 
         # Assign control point objectives
         for obj in filter(lambda o: isinstance(o, AttackCapturePointObjective), self.objectives):
@@ -134,7 +137,6 @@ class PlayerAI:
         # ----------------------------------------
 
         # Agents do what they have been assigned
-        enemy_damage_counter = [0 for i in enemy_units]
         for agent in self.agents:
             agent.do_objectives(world, enemy_units, friendly_units)
             if DUMP_OBJECTIVES or DUMP_ASSIGNED_MOVES:
@@ -156,7 +158,6 @@ class PlayerAI:
         if cp.position != pos:
             raise 'Invalid position for control point'
         return cp
-
 
     def get_max_clearance(self, world, x, y):
         max_clearance = 0

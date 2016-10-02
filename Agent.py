@@ -63,17 +63,19 @@ class Agent:
             self.activate_shield()
             return
 
-        # Pick up what you're standing on
-        if self.check_pickup_result() == PickupResult.PICK_UP_VALID:
-            self.pickup_item_at_position()
-            return
-
         # Work on the current objective
         if len(self.objectives) > 0:
             o = self.objectives[-1]
             if (isinstance(o, AttackCapturePointObjective)):
                 self.move_to_destination(o.position)
                 return
+            elif isinstance(o, PickupObjective):
+                if self.position == o.position and self.check_pickup_result() == PickupResult.PICK_UP_VALID:
+                    self.pickup_item_at_position()
+                    return
+                else:
+                    self.move_to_destination(o.position)
+                    return
         else:
             for enemy in sorted(filter(lambda e: e.health != 0, enemy_units),
                                 key=lambda e: world.get_path_length(self.position, e.position)):
