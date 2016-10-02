@@ -73,6 +73,7 @@ class Agent:
             o = self.objectives[-1]
             if (isinstance(o, AttackCapturePointObjective)):
                 self.move_to_destination(o.position)
+                return
         else:
             for enemy in sorted(filter(lambda e: e.health != 0, enemy_units),
                                 key=lambda e: world.get_path_length(self.position, e.position)):

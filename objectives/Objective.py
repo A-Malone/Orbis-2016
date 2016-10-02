@@ -12,6 +12,8 @@ class Objective():
         self.enemy_score = 0
         self.net_score = 0
 
+        self.agent_set = set()
+
         self.complete = False
 
     def update(self, world, enemy_units, friendly_units):

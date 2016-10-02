@@ -4,6 +4,7 @@ from PythonClientAPI.libs.Game.Entities import *
 from PythonClientAPI.libs.Game.World import *
 import itertools
 import time
+from collections import defaultdict
 
 from Agent import Agent
 from DamageCounter import DamageCounter
@@ -24,7 +25,10 @@ class PlayerAI:
         self.damage_map = DamageMap()
 
         self.objectives = []
-        self.position_to_objective_map = {}
+
+        self.position_to_cp_objective_map = {}
+        self.index_to_enemy_objective_map = {}
+        self.position_to_pickup_objective_map = {}
 
     def do_move(self, world, enemy_units, friendly_units):
         """
@@ -45,11 +49,9 @@ class PlayerAI:
                 tile_type = world.get_tile((x, y));
                 if tile_type == TileType.WALL:
                     continue
-                self.clearances[y][x] = get_max_clearance(world, x, y)
-            pretty_print_matrix(self.clearances)
-            self.map_openess_aggregate = sum(map(lambda x: sum(n ** 2 for n in x), self.clearances)) / sum(map(len, self.clearances))
-            if self.map_openess_aggregate >= MAP_OPENESS_AGGREGATE_THRESHOLD:
-                pass
+                self.clearances[y][x] = self.get_max_clearance(world, x, y)
+            self.map_openess_aggregate = sum(map(lambda x: sum(n ** 2 for n in x), self.clearances)) / sum(
+                map(len, self.clearances))
 
         # ---- UPDATES
         # ----------------------------------------
@@ -76,43 +78,57 @@ class PlayerAI:
 
         # Control point objectives
         for i, control_point in enumerate(world.control_points):
-            cp_obj = self.position_to_objective_map.get(control_point.position, None)
-
+            cp_obj = self.position_to_cp_objective_map.get(control_point.position, None)
             if (not cp_obj or cp_obj.complete == True):
                 if (control_point.controlling_team == self.team):
-                    new_objs.append(DefendCapturePointObjective(control_point.position, i))
+                    new_obj = DefendCapturePointObjective(control_point.position, i)
                 else:
-                    new_objs.append(AttackCapturePointObjective(control_point.position, i))
+                    new_obj = AttackCapturePointObjective(control_point.position, i)
+                new_objs.append(new_obj)
+                self.position_to_cp_objective_map[new_obj.position] = new_obj
 
         # Pickup Objectives
         for item in world.pickups:
-            item_obj = self.position_to_objective_map.get(item.position, None)
+            item_obj = self.position_to_pickup_objective_map.get(item.position, None)
+
             if (not item_obj or item_obj.complete == True):
-                new_objs.append(PickupObjective(item.position, item.pickup_type))
+                new_obj = PickupObjective(item.position, item.pickup_type)
+                self.position_to_pickup_objective_map[item.position] = new_obj
+                new_objs.append(new_obj)
 
         # Enemy Objectives
-        for item in world.pickups:
-            item_obj = self.position_to_objective_map.get(item.position, None)
-            if (not item_obj or item_obj.complete == True):
-                new_objs.append(PickupObjective(item.position, item.pickup_type))
+        for i, enemy in enumerate(enemy_units):
+            enemy_obj = self.index_to_enemy_objective_map.get(i, None)
+
+            if (not enemy_obj or enemy_obj.complete == True):
+                new_obj = EnemyObjective(enemy.position, i)
+                self.index_to_enemy_objective_map[i] = new_obj
+                new_objs.append(new_obj)
 
         # Update objective scores, and perform update logic
         for obj in new_objs:
             obj.update(world, enemy_units, friendly_units)
-            self.position_to_objective_map[obj.position] = obj
 
         self.objectives += new_objs
 
         # ---- ORDER AND ASSIGN OBJECTIVES
         # ----------------------------------------
 
+        # Prioritize picking up close weapons
+        for agent in self.agents:
+            if (agent.current_weapon_type == WeaponType.MINI_BLASTER):
+                for weapon in filter(lambda x: x.pickup_type != PickupType.WEAPON_MINI_BLASTER, world.pickups):
+                    weapon_obj = self.position_to_pickup_objective_map[weapon.position]
+                    if (not weapon_obj.agent_set and world.get_path_length(agent.position, weapon.position) < 3):
+                        agent.objectives.append(weapon_obj)
+                        weapon_obj.agent_set.add(agent)
+
         # Assign objectives to agents
         # For each control point we have that isn't already ours, in order of influence
-        for obj in filter(lambda o: isinstance(o, AttackCapturePointObjective), self.objectives):
-            for agent in sorted(filter(lambda a: len(a.objectives) == 0, self.agents),
-                                key=lambda a: world.get_path_length(a.position, obj.position)):
-                agent.objectives.append(obj)
-                break
+        # for obj in filter(lambda o: isinstance(o, AttackCapturePointObjective), self.objectives):
+        #    agent_iter = sorted(filter(lambda a: len(a.objectives) == 0, self.agents),
+        #                        key=lambda a: world.get_path_length(a.position, obj.position)):
+        #    next(agent_iter).objectives.append(obj)
 
         # ---- DO OBJECTIVES
         # ----------------------------------------
@@ -142,21 +158,13 @@ class PlayerAI:
         return cp
 
 
-def get_max_clearance(world, x, y):
-    max_clearance = 0
-    directions = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]
-    for d in directions:
-        this_clearance = 1
-        while world.get_tile(
-                (x + d[0] * this_clearance, y + d[1] * this_clearance)) != TileType.WALL and this_clearance < 11:
-            this_clearance += 1
-        max_clearance = max(max_clearance, this_clearance - 1)
-    return max_clearance
-
-
-def pretty_print_matrix(matrix):
-    s = [[str(e) for e in row] for row in matrix]
-    lens = [max(map(len, col)) for col in zip(*s)]
-    fmt = '\t'.join('{{:{}}}'.format(x) for x in lens)
-    table = [fmt.format(*row) for row in s]
-    print('\n'.join(table))
+    def get_max_clearance(self, world, x, y):
+        max_clearance = 0
+        directions = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]]
+        for d in directions:
+            this_clearance = 1
+            while world.get_tile(
+                    (x + d[0] * this_clearance, y + d[1] * this_clearance)) != TileType.WALL and this_clearance < 11:
+                this_clearance += 1
+            max_clearance = max(max_clearance, this_clearance - 1)
+        return max_clearance
