@@ -117,18 +117,18 @@ class PlayerAI:
         # Prioritize picking up close weapons
         for agent in self.agents:
             if (agent.current_weapon_type == WeaponType.MINI_BLASTER):
-                for weapon in filter(lambda x: x.pickup_type != PickupType.WEAPON_MINI_BLASTER, world.pickups):
+                for weapon in filter(lambda x: x.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), world.pickups):
                     weapon_obj = self.position_to_pickup_objective_map[weapon.position]
                     if (not weapon_obj.agent_set and world.get_path_length(agent.position, weapon.position) < 3):
                         agent.objectives.append(weapon_obj)
                         weapon_obj.agent_set.add(agent)
 
-        # Assign objectives to agents
-        # For each control point we have that isn't already ours, in order of influence
-        # for obj in filter(lambda o: isinstance(o, AttackCapturePointObjective), self.objectives):
-        #    agent_iter = sorted(filter(lambda a: len(a.objectives) == 0, self.agents),
-        #                        key=lambda a: world.get_path_length(a.position, obj.position)):
-        #    next(agent_iter).objectives.append(obj)
+        # Assign control point objectives
+        for obj in filter(lambda o: isinstance(o, AttackCapturePointObjective), self.objectives):
+            for agent in sorted(filter(lambda a: len(a.objectives) == 0, self.agents),
+                                key=lambda a: world.get_path_length(a.position, obj.position)):
+                agent.objectives.append(obj)
+                break
 
         # ---- DO OBJECTIVES
         # ----------------------------------------
