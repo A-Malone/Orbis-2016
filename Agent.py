@@ -80,7 +80,7 @@ class Agent:
             # Work on the current objective
             if len(self.objectives) > 0:
                 o = self.objectives[-1]
-                if (isinstance(o, AttackCapturePointObjective)):
+                if (isinstance(o, AttackCapturePointObjective) or isinstance(o, DefendCapturePointObjective)):
                     self.move_to_destination(o.position)
                     return
                 elif isinstance(o, PickupObjective):
@@ -95,7 +95,7 @@ class Agent:
                                     key=lambda e: world.get_path_length(self.position, e.position)):
                     self.move_to_destination(enemy.position)
                     return
-        except e:
+        except ValueError:
             traceback.print_exc()
 
     def has_no_assigned_move(self):
@@ -133,7 +133,9 @@ class Agent:
             astar.closed_set.add(self.last_move_destination)
         path = astar.get_path(self, self.position, destination, self.damage_map)
         if not path or len(path.path_list) == 0:
-            traceback.print_tb()
+            # COULD NOT FIND PATH
+            traceback.print_exc()
+            return
         move_target = path.path_list[-1]
         # self.damage_map.reserve_position(move_target)
         self.assigned_move = "MOVE " + str(move_target)

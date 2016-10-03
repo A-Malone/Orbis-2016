@@ -16,8 +16,9 @@ import traceback
 DUMP_OBJECTIVES = False
 DUMP_ASSIGNED_MOVES = False
 MAP_OPENESS_AGGREGATE_THRESHOLD = 25
+
 # The number of steps out of its path an agent will go to get an objective
-PATH_PICKUP_DISTANCE = 4
+PATH_PICKUP_DISTANCE = 1
 
 
 class PlayerAI:
@@ -77,7 +78,7 @@ class PlayerAI:
             agent.update_objectives()
 
         # ---- IDENTIFY AND UPDATE NEW OBJECTIVES
-        # ----------------------------------------        
+        # ----------------------------------------
 
         new_objs = []
 
@@ -116,16 +117,24 @@ class PlayerAI:
 
         self.objectives += new_objs
 
+        # ---- LOAD BALANCE
+        # ----------------------------------------
+        for obj in filter(lambda o: len(o.agent_set) > 1, self.objectives):
+            # If an objective has more than one agent associated with it, free them up
+            repo_agents = list(obj.agent_set)[1:]
+            for agent in repo_agents:
+                agent.objectives.remove(obj)
+                obj.agent_set.remove(agent)
+
         # ---- ORDER AND ASSIGN OBJECTIVES
         # ----------------------------------------
 
         # We used the weapon objectives many times, cache
         weapon_objectives = filter(
-            lambda x: isinstance(x, PickupObjective) and x.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), 
+            lambda x: isinstance(x, PickupObjective) and x.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN),
             self.objectives)
 
         # Prioritize picking up weapons on the way if we don't have one, and no one is going for it
-        
         for agent in self.agents:
             # Check to see if we need a weapon and already have an objective
             if (agent.needs_weapon and agent.objectives):
@@ -143,18 +152,22 @@ class PlayerAI:
                             agent.needs_weapon = False
                             break
                 continue
-            
+
             # Repair Kits
-            for repair_kit in filter(lambda x: x.pickup_type == PickupType.REPAIR_KIT, world.pickups):
-                repair_obj = self.position_to_pickup_objective_map[repair_kit.position]
-                if (not repair_obj.agent_set and world.get_path_length(agent.position,
-                                                                       repair_kit.position) <= PATH_PICKUP_DISTANCE):
-                    agent.objectives.append(repair_obj)
-                    repair_obj.agent_set.add(agent)
-                    break
+            if (agent.needs_weapon and agent.objectives):
+                last_objective = agent.objectives[-1]
+
+                for repair_kit in filter(lambda x: x.pickup_type == PickupType.REPAIR_KIT, world.pickups):
+                    repair_obj = self.position_to_pickup_objective_map[repair_kit.position]
+                    if (not repair_obj.complete and not repair_obj.agent_set):
+                        path_delta = world.get_path_length(agent.position, repair_obj.position) +  world.get_path_length(repair_obj.position, last_objective.position) - world.get_path_length(agent.position, last_objective.position)
+                        if (path_delta < PATH_PICKUP_DISTANCE):
+                            agent.objectives.append(repair_obj)
+                            repair_obj.agent_set.add(agent)
+                            break
 
         # Assign control point objectives
-        for obj in filter(lambda o: isinstance(o, AttackCapturePointObjective), self.objectives):
+        for obj in filter(lambda o: isinstance(o, AttackCapturePointObjective) and not o.agent_set, self.objectives):
             for agent in sorted(filter(lambda a: len(a.objectives) == 0, self.agents),
                                 key=lambda a: world.get_path_length(a.position, obj.position)):
                 agent.objectives.append(obj)
@@ -170,6 +183,7 @@ class PlayerAI:
                 obj.agent_set.add(agent)
                 agent.needs_weapon = False
                 break
+
 
         # ---- DO OBJECTIVES
         # ----------------------------------------

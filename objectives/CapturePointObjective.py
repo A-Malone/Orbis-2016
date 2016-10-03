@@ -4,7 +4,7 @@ class AttackCapturePointObjective(Objective):
     def __init__(self, position, control_point_index):
         super().__init__(position)
         self.control_point_index = control_point_index
-    
+
     def update(self, world, enemy_units, friendly_units):
         super().update(world, enemy_units, friendly_units)
         control_point = world.control_points[self.control_point_index]
@@ -12,7 +12,7 @@ class AttackCapturePointObjective(Objective):
 
 
 class DefendCapturePointObjective(Objective):
-    THRESHOLD = 10
+    THRESHOLD = 5
 
     def __init__(self, position, control_point_index):
         super().__init__(position)
