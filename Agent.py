@@ -5,51 +5,45 @@ from PythonClientAPI.libs.Game.World import *
 from astar import AStar
 from DamageCounter import DamageCounter
 from objectives import *
+import Utils
 import traceback
 
 
 class Agent:
     def __init__(self):
-        self.objectives = []
-        self.needs_weapon = True
+        self.objective_max_priority = 0
+        self.objectives = []        
 
-    def update(self, friendly, enemy_units, damage_map, enemy_damage_counter_prediction):
-        try:
-            self.assigned_move = None
+    def update(self, friendly, enemy_units, damage_map, enemy_damage_counter_prediction):        
+        self.assigned_move = None
 
-            self.unit = friendly
-            # Inherit from friendly
-            self.position = friendly.position
-            self.team = friendly.team
-            self.call_sign = friendly.call_sign
-            self.current_weapon_type = friendly.current_weapon_type
-            self.health = friendly.health
-            self.last_move_result = friendly.last_move_result
-            self.last_shot_result = friendly.last_shot_result
-            self.last_pickup_result = friendly.last_pickup_result
-            self.last_shield_activation_result = friendly.last_shield_activation_result
-            self.damage_taken_last_turn = friendly.damage_taken_last_turn
+        # Sketchy superclassing!
+        self.unit = friendly
 
-            self.damage_map = damage_map
-            self.enemy_damage_counter_prediction = enemy_damage_counter_prediction
+        # Inherit from friendly
+        self.position = friendly.position
+        self.team = friendly.team
+        self.call_sign = friendly.call_sign
+        self.current_weapon_type = friendly.current_weapon_type
+        self.health = friendly.health            
 
-            # Prepare to shoot if someone is in range, prioritizing low hp
-            for enemy in enemy_units:
-                shot_prediction = self.check_shot_against_enemy(enemy)
-                if shot_prediction == ShotResult.CAN_HIT_ENEMY and enemy.shielded_turns_remaining <= 0:
-                    self.enemy_damage_counter_prediction[enemy.call_sign].add_damage(self)
-        except e:
-            traceback.print_exc()
+        self.damage_map = damage_map
+        self.enemy_damage_counter_prediction = enemy_damage_counter_prediction
+
+        # Prepare to shoot if someone is in range, prioritizing low hp
+        for enemy in enemy_units:
+            shot_prediction = self.unit.check_shot_against_enemy(enemy)
+            if shot_prediction == ShotResult.CAN_HIT_ENEMY and enemy.shielded_turns_remaining <= 0:
+                self.enemy_damage_counter_prediction[enemy.call_sign].add_damage(self)
+        
 
     def update_objectives(self):
-        try:
-            if not self.objectives:
-                return
+        if not self.objectives:
+            return
 
-            # Remove complete objectives
-            self.objectives = [o for o in self.objectives if not o.complete]
-        except e:
-            traceback.print_exc()
+        # Remove complete objectives
+        self.objectives = [o for o in self.objectives if not o.complete]
+        
 
     def do_objectives(self, world, enemy_units, friendly_units):
         try:
@@ -73,7 +67,7 @@ class Agent:
                     return
 
             # Shield
-            if self.get_last_turn_shooters() and self.check_shield_activation() == ActivateShieldResult.SHIELD_ACTIVATION_VALID:
+            if self.unit.get_last_turn_shooters() and self.unit.check_shield_activation() == ActivateShieldResult.SHIELD_ACTIVATION_VALID:
                 self.activate_shield()
                 return
 
@@ -84,7 +78,7 @@ class Agent:
                     self.move_to_destination(o.position)
                     return
                 elif isinstance(o, PickupObjective):
-                    if self.position == o.position and self.check_pickup_result() == PickupResult.PICK_UP_VALID:
+                    if self.position == o.position and self.unit.check_pickup_result() == PickupResult.PICK_UP_VALID:
                         self.pickup_item_at_position()
                         return
                     else:
@@ -98,37 +92,35 @@ class Agent:
         except ValueError:
             traceback.print_exc()
 
+    def objective_cost(self, world, objective):
+        
+        if(not self.objectives):
+            return (0,0)
+        
+        best_cost = Utils.path_cost(world, self.position, objective.position, self.objectives[-1].position, self.objectives[0].position)
+        best_index = len(self.objectives)
+
+        for i in range(0,len(self.objectives)-1,):
+            cost = Utils.path_cost(world, self.objectives[i+1].position, objective.position, self.objectives[i].position, self.objectives[0].position)            
+            if (cost < best_cost):
+                best_cost = cost
+                best_index = i+1
+
+        return (best_cost, best_index)
+
     def has_no_assigned_move(self):
         return self.assigned_move is None
 
-    def check_move_in_direction(self, direction):
-        return self.unit.check_move_in_direction(direction)
-
-    def check_move_to_destination(self, destination):
-        return self.unit.check_move_to_destination(destination)
-
-    def check_pickup_result(self):
-        return self.unit.check_pickup_result()
-
-    def check_shield_activation(self):
-        return self.unit.check_shield_activation()
-
-    def check_shot_against_enemy(self, enemy):
-        return self.unit.check_shot_against_enemy(enemy)
-
-    def get_last_turn_shooters(self):
-        return self.unit.get_last_turn_shooters()
-
     def activate_shield(self):
         if self.assigned_move is not None:
-            raise "Assigned move to unit with move already!"
+            raise ValueError("Assigned move to unit with move already!")
         self.assigned_move = "SHIELD"
         return self.unit.activate_shield()
 
     def move_to_destination(self, destination):
         # Custom A* implementation
         astar = AStar()
-        if self.last_move_result in [MoveResult.BLOCKED_BY_ENEMY, MoveResult.BLOCKED_BY_FRIENDLY,
+        if self.unit.last_move_result in [MoveResult.BLOCKED_BY_ENEMY, MoveResult.BLOCKED_BY_FRIENDLY,
                                      MoveResult.BLOCKED_BY_WORLD]:
             astar.closed_set.add(self.last_move_destination)
         path = astar.get_path(self, self.position, destination, self.damage_map)
@@ -144,7 +136,7 @@ class Agent:
 
     def pickup_item_at_position(self):
         if self.assigned_move is not None:
-            raise "Assigned move to unit with move already!"
+            raise ValueError("Assigned move to unit with move already!")
         self.assigned_move = "PICKUP"
         return self.unit.pickup_item_at_position()
 
@@ -153,12 +145,15 @@ class Agent:
         :param EnemyUnit enemy_unit:
         """
         if self.assigned_move is not None:
-            raise "Assigned move to unit with move already!"
+            raise ValueError("Assigned move to unit with move already!")
         self.assigned_move = "SHOOT " + str(enemy_unit)
         return self.unit.shoot_at(enemy_unit)
 
     def standby(self):
         if self.assigned_move is not None:
-            raise "Assigned move to unit with move already!"
+            raise ValueError("Assigned move to unit with move already!")
         self.assigned_move = "STANDBY"
         return self.unit.standby()
+
+    def needs_weapon(self):
+        return self.current_weapon_type == WeaponType.MINI_BLASTER and not any(filter(lambda o : is_weapon_objective(o), self.objectives))

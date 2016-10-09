@@ -5,6 +5,7 @@ from PythonClientAPI.libs.Game.World import *
 import itertools
 import time
 from collections import defaultdict
+from queue import PriorityQueue
 
 from Agent import Agent
 from DamageCounter import DamageCounter
@@ -28,7 +29,12 @@ class PlayerAI:
         self.agents = [Agent() for i in range(4)]
         self.damage_map = DamageMap()
 
-        self.objectives = []
+        # Priority queue does not make sense because priorities change
+        self.global_objectives = list()
+        self.objectives = set()
+        
+        # Pickup objectives are tasks en-route to objectives
+        self.agent_task_list_map = {}
 
         self.position_to_cp_objective_map = {}
         self.index_to_enemy_objective_map = {}
@@ -48,16 +54,8 @@ class PlayerAI:
         print("iteration: {}".format(self.iterations))
         if self.iterations == 0:
             self.team = friendly_units[0].team
-            self.clearances = [[0 for x in range(world.width)] for y in range(world.height)]
-            for x, y in itertools.product(range(world.width), range(world.height)):
-                tile_type = world.get_tile((x, y));
-                if tile_type == TileType.WALL:
-                    continue
-                self.clearances[y][x] = self.get_max_clearance(world, x, y)
-            self.map_openess_aggregate = sum(map(lambda x: sum(n ** 2 for n in x), self.clearances)) / sum(
-                map(len, self.clearances))
-
-            print("OPENNESS " + str(self.map_openess_aggregate))
+            self.analyze_map(world)
+            self.agent_task_list_map = {agent : []}
 
         # ---- UPDATES
         # ----------------------------------------
@@ -72,118 +70,115 @@ class PlayerAI:
             obj.update(world, enemy_units, friendly_units)
 
         # Filter out complete objectives
-        self.objectives = [x for x in self.objectives if not x.complete]
+        self.objectives = set(filter(lambda x : not x.complete, self.objectives))
 
         for agent in self.agents:
             agent.update_objectives()
+            if (agent.health == 0):
+                for obj in agent.objectives:
+                    if (agent in obj.agent_set):
+                        obj.agent_set.remove(agent)
+                
+                agent.objectives = []
+                agent.objective_max_priority = 0
 
         # ---- IDENTIFY AND UPDATE NEW OBJECTIVES
         # ----------------------------------------
 
-        new_objs = []
-
-        # Control point objectives
+        # Global objectives
+        new_objs = []        
         for i, control_point in enumerate(world.control_points):
             cp_obj = self.position_to_cp_objective_map.get(control_point.position, None)
             if (not cp_obj or cp_obj.complete == True):
                 if (control_point.controlling_team == self.team):
-                    new_obj = DefendCapturePointObjective(control_point.position, i)
+                    pass
+                    # new_obj = DefendCapturePointObjective(control_point.position, i)
                 else:
-                    new_obj = AttackCapturePointObjective(control_point.position, i)
-                new_objs.append(new_obj)
-                self.position_to_cp_objective_map[new_obj.position] = new_obj
+                    new_obj = AttackCapturePointObjective(control_point.position, i, self.centrality[i])
+                    new_objs.append(new_obj)
+                    self.position_to_cp_objective_map[new_obj.position] = new_obj
 
-        # Pickup Objectives
+        # Update objective scores, and perform update logic, and the new objectives
+        for obj in new_objs:            
+            obj.update(world, enemy_units, friendly_units)
+            self.global_objectives.append(obj)
+            self.objectives.add(obj)
+
+        # Subtasks
+        new_task_objectives = []
         for item in world.pickups:
             item_obj = self.position_to_pickup_objective_map.get(item.position, None)
 
             if (not item_obj or item_obj.complete == True):
-                new_obj = PickupObjective(item.position, item.pickup_type)
+                new_obj = PickupObjective(item.position, item.pickup_type, self.map_openess_aggregate)
                 self.position_to_pickup_objective_map[item.position] = new_obj
-                new_objs.append(new_obj)
+                new_task_objectives.append(new_obj)
+
+        for task_obj in new_task_objectives:
+            for agent in self.agents:                
+                task = Task(agent, task_obj)
+                task_obj.update(world, enemy_units, friendly_units)
+                task.update(world)
+                self.agent_task_list_map[agent].append(task)
 
         # Enemy Objectives
-        for i, enemy in enumerate(enemy_units):
-            enemy_obj = self.index_to_enemy_objective_map.get(i, None)
+        # for i, enemy in enumerate(enemy_units):
+        #     enemy_obj = self.index_to_enemy_objective_map.get(i, None)
 
-            if (not enemy_obj or enemy_obj.complete == True):
-                new_obj = EnemyObjective(enemy.position, i)
-                self.index_to_enemy_objective_map[i] = new_obj
-                new_objs.append(new_obj)
+        #     if (not enemy_obj or enemy_obj.complete == True):
+        #         new_obj = EnemyObjective(enemy.position, i)
+        #         self.index_to_enemy_objective_map[i] = new_obj
+        #         new_objs.append(new_obj)
+        
 
-        # Update objective scores, and perform update logic
-        for obj in new_objs:
-            obj.update(world, enemy_units, friendly_units)
+        for agent in self.agents:
+            self.agent_task_list_map[agent].sort()
 
-        self.objectives += new_objs
+
 
         # ---- LOAD BALANCE
         # ----------------------------------------
-        for obj in filter(lambda o: len(o.agent_set) > 1, self.objectives):
-            # If an objective has more than one agent associated with it, free them up
-            repo_agents = list(obj.agent_set)[1:]
-            for agent in repo_agents:
-                agent.objectives.remove(obj)
-                obj.agent_set.remove(agent)
+        # for obj in filter(lambda o: len(o.agent_set) > 1, self.objectives):
+        #     # If an objective has more than one agent associated with it, free them up
+        #     repo_agents = list(obj.agent_set)[1:]
+        #     for agent in repo_agents:
+        #         agent.objectives.remove(obj)
+        #         obj.agent_set.remove(agent)
+
+        # ---- ORDER AND ASSIGN OBJECTIVES
+        # ----------------------------------------       
+        available_agents = set(filter(lambda x: x.health > 0, self.agents))
 
         # ---- ORDER AND ASSIGN OBJECTIVES
         # ----------------------------------------
 
-        # We used the weapon objectives many times, cache
-        weapon_objectives = filter(
-            lambda x: isinstance(x, PickupObjective) and x.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN),
-            self.objectives)
 
-        # Prioritize picking up weapons on the way if we don't have one, and no one is going for it
-        for agent in self.agents:
-            # Check to see if we need a weapon and already have an objective
-            if (agent.needs_weapon and agent.objectives):
-                last_objective = agent.objectives[-1]
+        # Iterate over the objectives in order of priority
+        for obj in reversed(self.global_objectives):            
 
-                # Look for close weapons
-                for weapon_obj in sorted(weapon_objectives, key=lambda x: -x.net_score*self.weapon_priority(x.pickup_type)):
-
-                    # Make sure this is a valid objective
-                    if (not weapon_obj.complete and not weapon_obj.agent_set):
-                        path_delta = world.get_path_length(agent.position, weapon_obj.position) +  world.get_path_length(weapon_obj.position, last_objective.position) - world.get_path_length(agent.position, last_objective.position)
-                        if (path_delta < PATH_PICKUP_DISTANCE):
-                            agent.objectives.append(weapon_obj)
-                            weapon_obj.agent_set.add(agent)
-                            agent.needs_weapon = False
-                            break
+            # If it's complete or someone is already on it, skip
+            if (obj.complete or obj.agent_set):
                 continue
 
-            # Repair Kits
-            if (agent.needs_weapon and agent.objectives):
-                last_objective = agent.objectives[-1]
+            # Do any agents have lower priority tasks?            
+            if (any(filter(lambda x: x.objective_max_priority < obj.priority))):
+                
+                valid_agents = filter(lambda x: x.objective_max_priority < obj.priority)
 
-                for repair_kit in filter(lambda x: x.pickup_type == PickupType.REPAIR_KIT, world.pickups):
-                    repair_obj = self.position_to_pickup_objective_map[repair_kit.position]
-                    if (not repair_obj.complete and not repair_obj.agent_set):
-                        path_delta = world.get_path_length(agent.position, repair_obj.position) +  world.get_path_length(repair_obj.position, last_objective.position) - world.get_path_length(agent.position, last_objective.position)
-                        if (path_delta < PATH_PICKUP_DISTANCE):
-                            agent.objectives.append(repair_obj)
-                            repair_obj.agent_set.add(agent)
-                            break
-
-        # Assign control point objectives
-        for obj in filter(lambda o: isinstance(o, AttackCapturePointObjective) and not o.agent_set, self.objectives):
-            for agent in sorted(filter(lambda a: len(a.objectives) == 0, self.agents),
-                                key=lambda a: world.get_path_length(a.position, obj.position)):
-                agent.objectives.append(obj)
-                obj.agent_set.add(agent)
-                break
-
-        # Assign agents that do not have an active objective to seek out weapons
-        weapon_objs = filter(lambda o: isinstance(o, PickupObjective) and o.pickup_type in (PickupType.WEAPON_LASER_RIFLE, PickupType.WEAPON_RAIL_GUN, PickupType.WEAPON_SCATTER_GUN), self.objectives)
-        for obj in sorted(weapon_objs, key=lambda x: -x.net_score*self.weapon_priority(x.pickup_type)):
-            for agent in sorted(filter(lambda a: len(a.objectives) == 0 and a.needs_weapon, self.agents),
-                                key=lambda a: world.get_path_length(a.position, obj.position)):
-                agent.objectives.append(obj)
-                obj.agent_set.add(agent)
-                agent.needs_weapon = False
-                break
-
+                # Assign objective to the most suitable agent
+                for agent in sorted(valid_agents, key=lambda a: world.get_path_length(a.position, obj.position)):                
+                    
+                    if(agent.objectives):
+                        print("Reassigning agent: {} - {}".format(obj.priority, obj))
+                        for i in agent.objectives:
+                            if (agent in i.agent_set):
+                                i.agent_set.remove(agent)
+                        
+                    #print("Assigning {} priority {} objective {}".format(agent.call_sign, obj.priority, obj))
+                    agent.objectives = [obj]
+                    agent.objective_max_priority = obj.priority                                        
+                    obj.agent_set.add(agent)
+                    available_agents.remove(agent)                    
 
         # ---- DO OBJECTIVES
         # ----------------------------------------
@@ -237,3 +232,21 @@ class PlayerAI:
                 return 1
         else:
             return 1
+
+    def analyze_map(self, world):        
+        self.clearances = [[0 for x in range(world.width)] for y in range(world.height)]
+        for x, y in itertools.product(range(world.width), range(world.height)):
+            tile_type = world.get_tile((x, y));
+            if tile_type == TileType.WALL:
+                continue
+            self.clearances[y][x] = self.get_max_clearance(world, x, y)
+        self.map_openess_aggregate = sum(map(lambda x: sum(n ** 2 for n in x), self.clearances)) / sum(
+            map(len, self.clearances))
+
+        print("OPENNESS " + str(self.map_openess_aggregate))
+
+        # Control point centrality scores
+        self.centrality = [1 / sum(map(lambda x: world.get_path_length(x.position, cp.position), world.control_points)) for cp in world.control_points]
+        max_centrality = max(self.centrality)
+        for i in range(len(self.centrality)):
+            self.centrality[i] /= max_centrality
